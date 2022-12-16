@@ -1,6 +1,6 @@
 import argparse
 import torch.nn.functional as F
-from torch import nn
+from torch import nn, Tensor
 from util.misc import *
 from .position_embedding import build_position_encoding
 
