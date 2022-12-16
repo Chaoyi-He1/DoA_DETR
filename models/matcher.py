@@ -23,6 +23,7 @@ class HungarianMatcher(nn.Module):
             cost_class: This is the relative weight of the classification error in the matching cost
             cost_bbox: This is the relative weight of the L1 error of the bounding box coordinates in the matching cost
             cost_giou: This is the relative weight of the giou loss of the bounding box in the matching cost
+            cost_direction: This is the relative weight of the angle loss in the matching cost
         """
         super().__init__()
         self.cost_class = cost_class
