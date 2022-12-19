@@ -206,8 +206,10 @@ class DETR(nn.Module):
                                (center_x, center_y, height, width). These values are normalized in [0, 1],
                                relative to the size of each individual image (disregarding possible padding).
                                See PostProcess for information on how to retrieve the unnormalized bounding box.
-               - "aux_outputs": Optional, only returned when auxilary losses are activated. It is a list of
-                                dictionnaries containing the two above keys for each decoder layer.
+               - "pred_directions": The normalized quadrants and angles for all queries, represented as
+                               (quadrant, angle). These values are normalized in [0, 1], relative to the size of each
+                               individual image (disregarding possible padding). See PostProcess for information on
+                               how to retrieve the unnormalized directions.
         """
         if isinstance(samples, (list, torch.Tensor)):
             samples = nested_tensor_from_tensor_list(samples)
