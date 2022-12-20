@@ -525,7 +525,6 @@ def random_affine(img, targets=(), degrees=10, translate=.1, scale=.1, shear=10,
 
 
 def augment_hsv(img, h_gain=0.5, s_gain=0.5, v_gain=0.5):
-    # 这里可以参考我写的博文:https://blog.csdn.net/qq_37541097/article/details/119478023
     r = np.random.uniform(-1, 1, 3) * [h_gain, s_gain, v_gain] + 1  # random gains
     test = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
     hue, sat, val = cv2.split(cv2.cvtColor(img, cv2.COLOR_BGR2HSV))
