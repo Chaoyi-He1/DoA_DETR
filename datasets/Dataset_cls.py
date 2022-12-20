@@ -13,6 +13,7 @@ from skimage.transform import resize
 from PIL import Image, ExifTags
 from torch.utils.data import Dataset
 from tqdm import tqdm
+from util.misc import nested_tensor_from_tensor_list
 
 help_url = 'https://github.com/ultralytics/yolov3/wiki/Train-Custom-Data'
 
@@ -94,11 +95,10 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         # Define labels
         # (./my_yolo_dataset/train/images/2009_004012) -> (./my_yolo_dataset/train/labels/2009_004012.txt)
-        self.label_files = [x.replace("images", "labels") + ".txt"
-                            for x in self.img_files]
+        self.label_files = [x.replace("images", "labels") + ".txt" for x in self.img_files]
 
         # Read image shapes (wh)
-        sp = path.replace(".txt", ".shapes")  # shapefile path
+        sp = path.replace(".txt", ".shapes")  # shapefile -> "data/my_train_data.shapes" or "data/my_val_data.shapes"
         try:
             with open(sp, "r") as f:  # read existing shapefile
                 s = [x.split() for x in f.read().splitlines()]
@@ -114,14 +114,15 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 image_files = self.img_files
             s = [read_img_pickle(f, self.img_size).shape for f in image_files]
             # s = [exif_size(Image.open(f)) for f in image_files]
-            # 将所有图片的shape信息保存在.shape文件中
+            # Save the shape information of all images in a .shape file
             np.savetxt(sp, s, fmt="%g")  # overwrite existing (if any)
 
         self.shapes = np.array(s, dtype=np.float64)
 
+        # cache images
+        self.imgs = [None] * n  # n is the total number of images
         # cache labels
-        self.imgs = [None] * n  # n为图像总数
-        # label: [class, x, y, w, h] 其中的xywh都为相对值
+        # label: [class, x, y, w, h, quadrant, angle] Among them, x y w h are all normalized values
         self.labels = [np.zeros((0, 7), dtype=np.float32)] * n
         labels_loaded = False
         nm, nf, ne, nd = 0, 0, 0, 0  # number missing, found, empty, duplicate
@@ -130,7 +131,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         if os.path.isfile(np_labels_path):
             x = np.load(np_labels_path, allow_pickle=True)
             if len(x) == n:
-                # 如果载入的缓存标签个数与当前计算的图像数目相同则认为是同一数据集，直接读缓存
+                # If the number of loaded cache tags is the same as the number of currently calculated images,
+                # it is considered to be the same data set, and the cache is read directly
                 self.labels = x
                 labels_loaded = True
 
@@ -225,7 +227,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             img, (h0, w0), (h, w) = load_img_pickle(self, index)    # img, hw_original, hw_resized
 
             # letterbox
-            shape = self.batch_shapes[self.batch[index]] if self.rect else self.img_size  # final letterboxed shape
+            shape = self.img_size  # final letterboxed shape
             img, ratio, pad = letterbox(img, shape, auto=False, scale_up=self.augment)
             shapes = (h0, w0), ((h / h0, w / w0), pad)  # for COCO mAP rescaling
 
@@ -263,7 +265,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
 
         if self.augment:
             # random left-right flip
-            lr_flip = True  # 随机水平翻转
+            lr_flip = True
             if lr_flip and random.random() < 0.5:
                 img = np.fliplr(img)
                 if nL:
@@ -276,6 +278,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 if nL:
                     labels[:, 2] = 1 - labels[:, 2]  # 1 - y_center
 
+        labels_out = {}
         if nL:
             labels_out = {
                 "labels": labels[:, 0],
@@ -283,27 +286,29 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 "directions": labels[:, 5:7]
             }
 
-        # Convert BGR to RGB, and HWC to CHW(3x512x512)
+        # Convert HWC to CHW(3kx512x512)
         img = img[:, :, :].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
 
         return torch.from_numpy(img), labels_out, self.img_files[index], shapes, index
 
     def coco_index(self, index):
-        """该方法是专门为cocotools统计标签信息准备，不对图像和标签作任何处理"""
+        """
+        This method is specially prepared for cocotools statistical label information,
+        without any processing on images and labels
+        """
         o_shapes = self.shapes[index][::-1]  # wh to hw
 
         # load labels
         x = self.labels[index]
-        labels = x.copy()  # label: class, x, y, w, h
+        labels = x.copy()  # label: class, x, y, w, h, quadrant, angle
         return torch.from_numpy(labels), o_shapes
 
     @staticmethod
     def collate_fn(batch):
-        img, label, path, shapes, index = zip(*batch)  # transposed
-        for i, l in enumerate(label):
-            l[:, 0] = i  # add target image index for build_targets()
-        return torch.stack(img, 0), torch.cat(label, 0), path, shapes, index
+        batch = list(zip(*batch))
+        batch[0] = nested_tensor_from_tensor_list(batch[0])
+        return tuple(batch)
 
 
 def load_image(self, index):
