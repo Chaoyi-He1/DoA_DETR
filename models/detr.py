@@ -228,6 +228,8 @@ class DETR(nn.Module):
 
 class PostProcess(nn.Module):
     """ This module converts the model's output into the format expected by the coco api"""
+    def __int__(self):
+        super(PostProcess, self).__int__()
     @torch.no_grad()
     def forward(self, outputs, target_sizes):
         """ Perform the computation
