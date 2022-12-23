@@ -467,3 +467,17 @@ def interpolate(input, size=None, scale_factor=None, mode="nearest", align_corne
         return _new_empty_tensor(input, output_shape)
     else:
         return torchvision.ops.misc.interpolate(input, size, scale_factor, mode, align_corners)
+
+
+def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
+
+    def f(x):
+        """Returns a learning rate multiplier based on the number of steps"""
+        # When the number of iterations is greater than the given warmup_iters, the multiplication factor is 1
+        if x >= warmup_iters:
+            return 1
+        alpha = float(x) / warmup_iters
+        # 迭代过程中倍率因子从warmup_factor -> 1
+        return warmup_factor * (1 - alpha) + alpha
+
+    return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=f)
