@@ -1,11 +1,7 @@
-import sys
-import os
+import time
 import torch
-from torch.cuda import amp
-import torch.nn.functional as F
 
 from datasets.coco_eval import CocoEvaluator
-from datasets.coco_utils import get_coco_api_from_dataset
 import distributed_utils as utils
 
 
@@ -29,7 +25,9 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
         if device != torch.device("cpu"):
             torch.cuda.synchronize(device)
 
+        model_time = time.time()
         outputs = model(samples)
+        model_time = time.time() - model_time
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
 
@@ -50,8 +48,11 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
             target_sizes = torch.stack([t["size"] for t in targets], dim=0)
             results = postprocessors['segm'](results, outputs, orig_target_sizes, target_sizes)
         res = {target['image_id'].item(): output for target, output in zip(targets, results)}
+        evaluator_time = time.time()
         if coco_evaluator is not None:
             coco_evaluator.update(res)
+        evaluator_time = time.time() - evaluator_time
+        metric_logger.update(model_time=model_time, evaluator_time=evaluator_time)
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -68,7 +69,5 @@ def evaluate(model, criterion, postprocessors, data_loader, base_ds, device, out
     if coco_evaluator is not None:
         if 'bbox' in postprocessors.keys():
             stats['coco_eval_bbox'] = coco_evaluator.coco_eval['bbox'].stats.tolist()
-        if 'segm' in postprocessors.keys():
-            stats['coco_eval_masks'] = coco_evaluator.coco_eval['segm'].stats.tolist()
 
     return stats, coco_evaluator

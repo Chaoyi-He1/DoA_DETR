@@ -124,9 +124,9 @@ def reduce_dict(input_dict, average=True):
     input_dict, after reduction.
     """
     world_size = get_world_size()
-    if world_size < 2:  # 单GPU的情况
+    if world_size < 2:  # The case of a single GPU
         return input_dict
-    with torch.no_grad():  # 多GPU的情况
+    with torch.no_grad():  # The case of multiple GPUs
         names = []
         values = []
         # sort the keys so that they are consistent across processes
