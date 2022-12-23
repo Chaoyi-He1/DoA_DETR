@@ -1,15 +1,14 @@
-import math
-import os
 import sys
 from typing import Iterable
 
 import torch
+from torch.cuda import amp
 import util.misc as utils
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
-                    device: torch.device, epoch: int, max_norm: float = 0,
+                    device: torch.device, epoch: int, accumulate: int, max_norm: float = 0,
                     warmup=False, scaler=None):
     model.train()
     criterion.train()
@@ -22,7 +21,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
         accumulate = 1
 
-    now_lr = 0.
     nb = len(data_loader)  # number of batches
 
     metric_logger = utils.MetricLogger(delimiter=";  ")
@@ -37,10 +35,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        outputs = model(samples)
-        loss_dict = criterion(outputs, targets)
-        weight_dict = criterion.weight_dict
-        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+        with amp.autocast(enabled=scaler is not None):
+            outputs = model(samples)
+            loss_dict = criterion(outputs, targets)
+            weight_dict = criterion.weight_dict
+            losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
@@ -50,23 +49,41 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                                     for k, v in loss_dict_reduced.items() if k in weight_dict}
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
 
-        loss_value = losses_reduced_scaled.item()
-
-        if not math.isfinite(loss_value):
-            print("Loss is {}, stopping training".format(loss_value))
+        if not torch.isfinite(losses_reduced_scaled):
+            print("Loss is {}, stopping training".format(losses_reduced_scaled.item()))
             print(loss_dict_reduced)
             sys.exit(1)
 
+        losses *= 1. / accumulate  # scale loss
+
+        # backward
         optimizer.zero_grad()
-        losses.backward()
+        if scaler is not None:
+            scaler.scale(losses).backward()
+        else:
+            losses.backward()
+
         if max_norm > 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm)
-        optimizer.step()
 
-        metric_logger.update(loss=loss_value, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
+        # optimize
+        # Update the weights every 64 images trained
+        if ni % accumulate == 0:
+            if scaler is not None:
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                optimizer.step()
+
+        metric_logger.update(loss=losses_reduced_scaled, **loss_dict_reduced_scaled, **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+
+        if ni % accumulate == 0 and lr_scheduler is not None:  # The first round uses the warmup training method
+            lr_scheduler.step()
+
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
+
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
