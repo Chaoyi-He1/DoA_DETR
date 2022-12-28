@@ -2,6 +2,7 @@ import argparse
 import datetime
 import glob
 import json
+import math
 import random
 import time
 from pathlib import Path
@@ -11,6 +12,7 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader, DistributedSampler
 from torch.utils.tensorboard import SummaryWriter
+import torch.optim.lr_scheduler as lr_scheduler
 
 import datasets
 import util.misc as utils
@@ -35,8 +37,7 @@ def get_args_parser():
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
     # Model parameters
-    parser.add_argument('--weights', type=str, default='',
-                        help="initial weights path")
+    parser.add_argument('--weights', type=str, default='', help="initial weights path")
     # * Backbone
     parser.add_argument('--position_embedding', default='sine', type=str, choices=('sine', 'learned'),
                         help="Type of positional embedding to use on top of the image features")
@@ -89,6 +90,21 @@ def get_args_parser():
     return parser
 
 
+def model_info(model):
+    # Plots a line-by-line description of a PyTorch model
+    n_p = sum(x.numel() for x in model.parameters())  # number parameters
+    n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
+
+    try:  # FLOPS
+        from thop import profile
+        macs, _ = profile(model, inputs=(torch.zeros(1, 3, 512, 512),), verbose=False)
+        fs = ', %.1f GFLOPS' % (macs / 1E9 * 2)
+    except:
+        fs = ''
+
+    print('Model Summary: %g layers, %g parameters, %g gradients%s' % (len(list(model.parameters())), n_p, n_g, fs))
+
+
 def main(args, hyp):
     utils.init_distributed_mode(args)
     if args.rank in [-1, 0]:
@@ -126,24 +142,62 @@ def main(args, hyp):
 
     model, criterion, postprocessors = build_model(args, hyp)
     model.to(device)
+    accumulate = max(round(64 / (args.world_size * args.batch_size)), 1)
 
     model_without_ddp = model
     if args.distributed:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
         model_without_ddp = model.module
+
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
+    model_info(model)
 
-    param_dicts = [
-        {"params": [p for n, p in model_without_ddp.named_parameters() if "backbone" not in n and p.requires_grad]},
-        {
-            "params": [p for n, p in model_without_ddp.named_parameters() if "backbone" in n and p.requires_grad],
-            "lr": args.lr_backbone,
-        },
-    ]
-    optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
+    start_epoch = 0
+    scaler = torch.cuda.amp.GradScaler() if args.amp else None
+    # If pretrained weights are specified, load pretrained weights
+    if args.weights.endswith(".pt"):
+        ckpt = torch.load(args.weights, map_location=device)
+        # load model
+        try:
+            ckpt["model"] = {k: v for k, v in ckpt["model"].items()
+                             if model.state_dict()[k].numel() == v.numel()}
+            model.load_state_dict(ckpt["model"], strict=False)
+        except KeyError as e:
+            s = "%s is not compatible with %s. Specify --weights '' or specify a --cfg compatible with %s. " \
+                "See https://github.com/ultralytics/yolov3/issues/657" % (args.weights, args.hyp, args.weights)
+            raise KeyError(s) from e
+        if args.rank in [-1, 0]:
+            # load results
+            if ckpt.get("training_results") is not None:
+                with open(results_file, "w") as file:
+                    file.write(ckpt["training_results"])  # write results.txt
+        # epochs
+        start_epoch = ckpt["epoch"] + 1
+        if args.epochs < start_epoch:
+            print('%s has been trained for %g epochs. Fine-tuning for %g additional epochs.' %
+                  (args.weights, ckpt['epoch'], args.epochs))
+            args.epochs += ckpt['epoch']  # finetune additional epochs
+        if args.amp and "scaler" in ckpt:
+            scaler.load_state_dict(ckpt["scaler"])
+        del ckpt
+
+    # Whether to freeze the weights and only train the weights of the Transformer
+    # if args.freeze_layers:
+
+    # param_dicts = [
+    #     {"params": [p for n, p in model_without_ddp.named_parameters() if "backbone" not in n and p.requires_grad]},
+    #     {
+    #         "params": [p for n, p in model_without_ddp.named_parameters() if "backbone" in n and p.requires_grad],
+    #         "lr": args.lr_backbone,
+    #     },
+    # ]
+    pg = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.AdamW(pg, lr=args.lr,
                                   weight_decay=args.weight_decay)
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, args.lr_drop)
+    lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - hyp["lrf"]) + hyp["lrf"]  # cosine
+    scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
+    scheduler.last_epoch = start_epoch  # 指定从哪个epoch开始
 
     dataset_train = build_dataset(image_set='train', args=args)
     dataset_val = build_dataset(image_set='val', args=args)
@@ -252,8 +306,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
     # Check if files exist
     args.hyp = check_file(args.hyp)
-    args.data = check_file(args.data)
+    # args.dataset_file = check_file(args.dataset_file)
 
     with open(args.hyp) as f:
         hyp = yaml.load(f, Loader=yaml.FullLoader)
     print("freeze: ", args.weights)
+    main(args, hyp)

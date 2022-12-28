@@ -2,7 +2,7 @@ import time
 import torch
 
 from datasets.coco_eval import CocoEvaluator
-import distributed_utils as utils
+import util.distributed_utils as utils
 
 
 @torch.no_grad()
