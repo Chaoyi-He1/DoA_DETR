@@ -259,7 +259,7 @@ class PostProcess(nn.Module):
         return results
 
 
-def build(args):
+def build(args, hyp):
     # the `num_classes` naming here is somewhat misleading.
     # it indeed corresponds to `max_obj_id + 1`, where max_obj_id
     # is the maximum id for a class in your dataset. For example,
@@ -277,7 +277,7 @@ def build(args):
 
     backbone = build_backbone(args)
 
-    transformer = build_transformer(args)
+    transformer = build_transformer(hyp)
 
     model = DETR(
         backbone,

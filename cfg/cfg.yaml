@@ -1,5 +1,6 @@
 # Hyperparameters for training
 
+# Transformer
 d_model: 512
 nhead: 8
 num_encoder_layers: 6
@@ -9,3 +10,12 @@ dropout: 0.1
 activation: "relu"
 normalize_before: False
 return_intermediate_dec: False
+
+# Image Augmentation
+hsv_h: 0.0138  # image HSV-Hue augmentation (fraction)
+hsv_s: 0.678  # image HSV-Saturation augmentation (fraction)
+hsv_v: 0.36  # image HSV-Value augmentation (fraction)
+degrees: 0.  # image rotation (+/- deg)
+translate: 0.  # image translation (+/- fraction)
+scale: 0.  # image scale (+/- gain)
+shear: 0.  # image shear (+/- deg)
