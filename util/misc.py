@@ -477,7 +477,7 @@ def warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor):
         if x >= warmup_iters:
             return 1
         alpha = float(x) / warmup_iters
-        # 迭代过程中倍率因子从warmup_factor -> 1
+        # The multiplication factor changes from warmup_factor -> 1 during iteration
         return warmup_factor * (1 - alpha) + alpha
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=f)

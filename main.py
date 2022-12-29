@@ -11,12 +11,14 @@ import yaml
 import torch
 import numpy as np
 from torch.utils.data import DataLoader, DistributedSampler
+from util.distributed_utils import torch_distributed_zero_first
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
 
 import datasets
 import util.misc as utils
-from datasets import *
+from datasets import parse_data_cfg
+from datasets.Dataset_cls import LoadImagesAndLabels
 from datasets.coco_utils import get_coco_api_from_dataset
 from models import build_model
 from util.eval_utils import evaluate
@@ -43,6 +45,7 @@ def get_args_parser():
                         help="Type of positional embedding to use on top of the image features")
     parser.add_argument('--freeze-layers', type=bool, default=False,
                         help='Freeze non-output layers')
+    parser.add_argument('--img-size', type=int, default=512, help='Image size')
 
     # * Transformer
     parser.add_argument('--hyp', type=str, default='cfg/cfg.yaml', help='hyperparameters path')
@@ -71,7 +74,7 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='data/my_data.data')
-
+    parser.add_argument('--cache_images', default=True, help="cache images to RAM")
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
     parser.add_argument('--seed', default=42, type=int)
@@ -79,7 +82,7 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=2, type=int)
+    parser.add_argument('--num_workers', default=4, type=int)
 
     # distributed training parameters
     parser.add_argument('--savebest', type=bool, default=False, help='only save best checkpoint')
@@ -112,9 +115,6 @@ def main(args, hyp):
         tb_writer = SummaryWriter(comment=args.name)
 
     print("git:\n  {}\n".format(utils.get_sha()))
-
-    if args.frozen_weights is not None:
-        assert args.masks, "Frozen training is meant for segmentation only"
     print(args)
 
     device = torch.device(args.device)
@@ -183,7 +183,12 @@ def main(args, hyp):
         del ckpt
 
     # Whether to freeze the weights and only train the weights of the Transformer
-    # if args.freeze_layers:
+    if args.freeze_layers:
+        for n, p in model.named_parameters():
+            if "backbone" in n:
+                p.requires_grad_(False)
+
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
 
     # param_dicts = [
     #     {"params": [p for n, p in model_without_ddp.named_parameters() if "backbone" not in n and p.requires_grad]},
@@ -199,8 +204,26 @@ def main(args, hyp):
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # 指定从哪个epoch开始
 
-    dataset_train = build_dataset(image_set='train', args=args)
-    dataset_val = build_dataset(image_set='val', args=args)
+    # dataset
+    # Make sure only the first process in DDP process the dataset first, and the following others can use the cache.
+    with torch_distributed_zero_first(opt.rank):
+        dataset_train = LoadImagesAndLabels(path=train_path,
+                                            img_size=args.img_size,
+                                            batch_size=args.batch_size,
+                                            augment=False,
+                                            hyp=hyp,  # augmentation hyperparameters
+                                            mosaic=False,
+                                            cache_images=args.cache_images,
+                                            rank=args.rank)
+        # 验证集的图像尺寸指定为img_size(512)
+        dataset_val = LoadImagesAndLabels(path=test_path,
+                                          img_size=args.img_size,
+                                          batch_size=args.batch_size,
+                                          augment=False,
+                                          hyp=hyp,  # augmentation hyperparameters
+                                          mosaic=False,
+                                          cache_images=args.cache_images,
+                                          rank=args.rank)
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)
