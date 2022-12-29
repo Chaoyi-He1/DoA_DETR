@@ -60,6 +60,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                  img_size=512,
                  batch_size=16,
                  augment=False,
+                 hyp=None,
                  mosaic=False,
                  cache_images=False,  # If cache the data into RAM
                  single_cls=False, pad=0.0, rank=-1):
@@ -91,6 +92,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.batch = bi  # batch index of image
         self.img_size = img_size
         self.augment = augment
+        self.hyp = hyp
         self.mosaic = self.augment and mosaic  # load 4 images at a time into a mosaic (only during training)
 
         # Define labels
