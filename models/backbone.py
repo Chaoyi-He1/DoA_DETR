@@ -1,4 +1,5 @@
 import argparse
+from typing import Tuple
 import torch.nn.functional as F
 from torch import nn, Tensor
 from util.misc import *
@@ -44,15 +45,16 @@ class DarkNet(nn.Module):
         self.cov_2 = Convolutional(img_channel=self.channels, filters=self.channels * 2, size=3, stride=2)
         self.channels *= 2
         self.img_size /= 2
-        self.res_net = nn.Sequential()
+        self.res_net = []
         self.num_res_blocks = [1, 2, 8, 8, 4]
         for i, res_block in enumerate(self.num_res_blocks):
-            self.res_net.append(*[Res_block(img_channel=self.channels) for _ in range(res_block)])
+            self.res_net.extend([Res_block(img_channel=self.channels) for _ in range(res_block)])
             if i != len(self.num_res_blocks) - 1:
                 self.res_net.append(Convolutional(img_channel=self.channels, filters=self.channels * 2, size=3,
                                                   stride=2))
                 self.channels *= 2
                 self.img_size /= 2
+        self.res_net = nn.Sequential(*self.res_net)
         self.max_pool_5 = nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2)
         self.max_pool_9 = nn.MaxPool2d(kernel_size=9, stride=1, padding=(9 - 1) // 2)
         self.max_pool_13 = nn.MaxPool2d(kernel_size=13, stride=1, padding=(13 - 1) // 2)
@@ -76,7 +78,8 @@ class Joiner(nn.Sequential):
     def __init__(self, backbone, position_embedding):
         super().__init__(backbone, position_embedding)
 
-    def forward(self, tensor_list: NestedTensor) -> (NestedTensor, Tensor):
+    def forward(self, tensor_list):
+        # type: (NestedTensor) -> Tuple[NestedTensor, Tensor]
         xs = self[0](tensor_list.tensors)
         m = tensor_list.mask
         assert m is not None
@@ -88,8 +91,8 @@ class Joiner(nn.Sequential):
         return out, pos
 
 
-def build_backbone(args):
-    position_embedding = build_position_encoding(args)
+def build_backbone(args, hyp):
+    position_embedding = build_position_encoding(args, hyp)
     backbone = DarkNet(args)
     model = Joiner(backbone, position_embedding)
     model.num_channels = backbone.channels
