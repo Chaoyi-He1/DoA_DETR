@@ -204,26 +204,8 @@ def main(args, hyp):
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from
 
-    # dataset
-    # Make sure only the first process in DDP process the dataset first, and the following others can use the cache.
-    with torch_distributed_zero_first(opt.rank):
-        dataset_train = LoadImagesAndLabels(path=train_path, 
-                                            img_size=args.img_size, 
-                                            batch_size=args.batch_size,
-                                            augment=False,
-                                            hyp=hyp,  # augmentation hyperparameters
-                                            mosaic=False,
-                                            cache_images=args.cache_images,
-                                            rank=args.rank)
-        # 验证集的图像尺寸指定为img_size(512)
-        dataset_val = LoadImagesAndLabels(path=test_path, 
-                                          img_size=args.img_size, 
-                                          batch_size=args.batch_size,
-                                          augment=False,
-                                          hyp=hyp,  # augmentation hyperparameters
-                                          mosaic=False,
-                                          cache_images=args.cache_images,
-                                          rank=args.rank)
+    dataset_train = build_dataset(image_set='train', args=args)
+    dataset_val = build_dataset(image_set='val', args=args)
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)
