@@ -6,6 +6,7 @@ import math
 import os
 import random
 import time
+import pickle
 from pathlib import Path
 
 import yaml
@@ -231,12 +232,26 @@ def main(args, hyp):
 
     batch_sampler_train = torch.utils.data.BatchSampler(sampler_train, args.batch_size, drop_last=True)
 
+    # dataloader
+    nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
+    if args.rank in [-1, 0]:
+        print('Using %g dataloader workers' % nw)
     data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
-                                   collate_fn=utils.collate_fn, num_workers=args.num_workers)
+                                   collate_fn=utils.collate_fn, pin_memory=True, num_workers=nw)
     data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
-                                 drop_last=False, collate_fn=utils.collate_fn, num_workers=args.num_workers)
+                                 drop_last=False, collate_fn=utils.collate_fn, pin_memory=True, num_workers=nw)
 
-    base_ds = get_coco_api_from_dataset(dataset_val)
+    # base_ds = get_coco_api_from_dataset(dataset_val)
+    # start training
+    # caching val_data when you have plenty of memory(RAM)
+    with torch_distributed_zero_first(args.rank):
+        if os.path.exists("tmp.pk") is False:
+            base_ds = get_coco_api_from_dataset(dataset_val)
+            with open("tmp.pk", "wb") as f:
+                pickle.dump(base_ds, f)
+        else:
+            with open("tmp.pk", "rb") as f:
+                base_ds = pickle.load(f)
 
     output_dir = Path(args.output_dir)
     if args.resume:
