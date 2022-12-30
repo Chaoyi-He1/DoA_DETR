@@ -12,7 +12,7 @@ def convert_to_coco_api(ds):
     ann_id = 1
     dataset = {'images': [], 'categories': [], 'annotations': []}
     categories = set()
-    # 遍历dataset中的每张图像
+    # Iterate over each image in the dataset
     for img_idx in tqdm(range(len(ds)), desc="loading eval info for coco tools."):
         # find better way to get target
         targets, shapes = ds.coco_index(img_idx)
@@ -26,7 +26,7 @@ def convert_to_coco_api(ds):
         for obj in targets:
             ann = {}
             ann["image_id"] = img_idx
-            # 将相对坐标转为绝对坐标
+            # Convert relative coordinates to absolute coordinates
             # box (x, y, w, h)
             boxes = obj[1:]
             # (x, y, w, h) to (xmin, ymin, w, h)
