@@ -3,6 +3,7 @@ import datetime
 import glob
 import json
 import math
+import os
 import random
 import time
 from pathlib import Path
@@ -45,7 +46,7 @@ def get_args_parser():
                         help="Type of positional embedding to use on top of the image features")
     parser.add_argument('--freeze-layers', type=bool, default=False,
                         help='Freeze non-output layers')
-    parser.add_argument('--img-size', type=int, default=512, help='Image size')
+    parser.add_argument('--img_size', type=int, default=512, help='Image size')
 
     # * Transformer
     parser.add_argument('--hyp', type=str, default='cfg/cfg.yaml', help='hyperparameters path')
@@ -204,8 +205,22 @@ def main(args, hyp):
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from
 
-    dataset_train = build_dataset(image_set='train', args=args)
-    dataset_val = build_dataset(image_set='val', args=args)
+    with torch_distributed_zero_first(args.rank):
+        dataset_train = LoadImagesAndLabels(path=train_path,
+                                            img_size=args.img_size,
+                                            batch_size=args.batch_size,
+                                            augment=False,
+                                            hyp=hyp,  # augmentation hyperparameters # rectangular training
+                                            cache_images=args.cache_images,
+                                            rank=args.rank)
+        # 验证集的图像尺寸指定为img_size(512)
+        dataset_val = LoadImagesAndLabels(path=test_path,
+                                          img_size=args.img_size,
+                                          batch_size=args.batch_size,
+                                          augment=False,
+                                          hyp=hyp,  # augmentation hyperparameters # rectangular training
+                                          cache_images=args.cache_images,
+                                          rank=args.rank)
 
     if args.distributed:
         sampler_train = DistributedSampler(dataset_train)
@@ -214,8 +229,7 @@ def main(args, hyp):
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
-    batch_sampler_train = torch.utils.data.BatchSampler(
-        sampler_train, args.batch_size, drop_last=True)
+    batch_sampler_train = torch.utils.data.BatchSampler(sampler_train, args.batch_size, drop_last=True)
 
     data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
                                    collate_fn=utils.collate_fn, num_workers=args.num_workers)
@@ -223,10 +237,6 @@ def main(args, hyp):
                                  drop_last=False, collate_fn=utils.collate_fn, num_workers=args.num_workers)
 
     base_ds = get_coco_api_from_dataset(dataset_val)
-
-    if args.frozen_weights is not None:
-        checkpoint = torch.load(args.frozen_weights, map_location='cpu')
-        model_without_ddp.detr.load_state_dict(checkpoint['model'])
 
     output_dir = Path(args.output_dir)
     if args.resume:
