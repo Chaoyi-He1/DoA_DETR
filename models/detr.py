@@ -275,7 +275,7 @@ def build(args, hyp):
         num_classes = 250
     device = torch.device(args.device)
 
-    backbone = build_backbone(args)
+    backbone = build_backbone(args, hyp)
 
     transformer = build_transformer(hyp)
 
@@ -283,7 +283,7 @@ def build(args, hyp):
         backbone,
         transformer,
         num_classes=num_classes,
-        num_queries=args.num_queries)
+        num_queries=hyp["num_queries"])
 
     matcher = build_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef, 'loss_giou': args.giou_loss_coef,

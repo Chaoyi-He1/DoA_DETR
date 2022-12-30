@@ -10,6 +10,7 @@ dropout: 0.1
 activation: "relu"
 normalize_before: False
 return_intermediate_dec: False
+num_queries: 100
 
 # Image Augmentation
 hsv_h: 0.0138  # image HSV-Hue augmentation (fraction)
