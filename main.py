@@ -255,6 +255,10 @@ def main(args, hyp):
 
     output_dir = Path(args.output_dir)
 
+    if args.rank in [-1, 0]:
+        print("starting traning for %g epochs..." % args.epochs)
+        print('Using %g dataloader workers' % nw)
+
     if args.eval:
         test_stats, coco_evaluator = evaluate(model, criterion, postprocessors,
                                               data_loader_val, base_ds, device, args.output_dir)
@@ -264,7 +268,7 @@ def main(args, hyp):
 
     print("Start training")
     start_time = time.time()
-    for epoch in range(args.start_epoch, args.epochs):
+    for epoch in range(start_epoch, args.epochs + start_epoch):
         if args.distributed:
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(
