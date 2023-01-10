@@ -134,12 +134,12 @@ class SetCriterion(nn.Module):
 
     def loss_directions(self, outputs, targets, indices, num_directions):
         """Compute the losses related to the angle: the L1 regression loss.
-           targets dicts must contain the key "directions" containing a tensor of dim [nb_target_boxes, h, w]
+           targets dicts must contain the key "directions" containing a tensor of dim [nb_target_boxes, quadrant, angle]
         """
         assert "pred_directions" in outputs
         idx = self._get_src_permutation_idx(indices)
         src_directions = outputs['pred_directions'][idx]
-        target_directions = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        target_directions = torch.cat([t['directions'][i] for t, (_, i) in zip(targets, indices)], dim=0)
 
         loss_directions = F.l1_loss(src_directions, target_directions, reduction='none')
 

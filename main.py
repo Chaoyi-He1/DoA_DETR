@@ -35,8 +35,7 @@ def get_args_parser():
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--clip_max_norm', default=0.1, type=float,
-                        help='gradient clipping max norm')
+    parser.add_argument('--clip_max_norm', default=0.1, type=float, help='gradient clipping max norm')
     parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
@@ -271,9 +270,9 @@ def main(args, hyp):
     for epoch in range(start_epoch, args.epochs + start_epoch):
         if args.distributed:
             sampler_train.set_epoch(epoch)
-        train_stats = train_one_epoch(
-            model, criterion, data_loader_train, optimizer, device, epoch,
-            args.clip_max_norm)
+        train_stats = train_one_epoch(model=model, criterion=criterion, data_loader=data_loader_train,
+                                      optimizer=optimizer, device=device, epoch=epoch, accumulate=accumulate,
+                                      max_norm=args.clip_max_norm, warmup=True, scaler=scaler)
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
@@ -290,8 +289,7 @@ def main(args, hyp):
                 }, checkpoint_path)
 
         test_stats, coco_evaluator = evaluate(
-            model, criterion, postprocessors, data_loader_val, base_ds, device, args.output_dir
-        )
+            model, criterion, postprocessors, data_loader_val, base_ds, device)
 
         log_stats = {**{f'train_{k}': v for k, v in train_stats.items()},
                      **{f'test_{k}': v for k, v in test_stats.items()},
