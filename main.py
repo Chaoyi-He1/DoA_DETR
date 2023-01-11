@@ -210,7 +210,7 @@ def main(args, hyp):
                                             img_size=args.img_size,
                                             batch_size=args.batch_size,
                                             augment=False,
-                                            hyp=hyp,  # augmentation hyperparameters # rectangular training
+                                            hyp=hyp,  # augmentation hyper-parameters
                                             cache_images=args.cache_images,
                                             rank=args.rank)
         # 验证集的图像尺寸指定为img_size(512)
@@ -218,7 +218,7 @@ def main(args, hyp):
                                           img_size=args.img_size,
                                           batch_size=args.batch_size,
                                           augment=False,
-                                          hyp=hyp,  # augmentation hyperparameters # rectangular training
+                                          hyp=hyp,  # augmentation hyper-parameters
                                           cache_images=args.cache_images,
                                           rank=args.rank)
 
