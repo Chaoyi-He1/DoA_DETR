@@ -145,7 +145,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             pbar = self.label_files
 
         # Sweeping and loading label files
-        for i, file in enumerate(pbar):     # (./my_yolo_dataset/train/labels/2009_004012.txt)
+        for i, file in enumerate(pbar):  # (./my_yolo_dataset/train/labels/2009_004012.txt)
             if labels_loaded is True:
                 # If there is a cache, read directly from the cache
                 l = self.labels[i]
@@ -175,7 +175,6 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 nf += 1  # file found
             else:
                 ne += 1  # file empty
-
 
             if rank in [-1, 0]:
                 # Update progress bar description information
@@ -226,7 +225,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
             shapes = None
         else:
             # load image
-            img, (h0, w0), (h, w) = load_img_pickle(self, index)    # img, hw_original, hw_resized
+            img, (h0, w0), (h, w) = load_img_pickle(self, index)  # img, hw_original, hw_resized
 
             # letterbox
             shape = self.img_size  # final letterboxed shape
