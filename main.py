@@ -205,6 +205,7 @@ def main(args, hyp):
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from
 
+    # dataset generate
     with torch_distributed_zero_first(args.rank):
         dataset_train = LoadImagesAndLabels(path=train_path,
                                             img_size=args.img_size,
