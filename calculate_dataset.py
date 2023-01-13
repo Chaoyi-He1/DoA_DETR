@@ -23,7 +23,7 @@ def calculate_data_txt(txt_path, dataset_dir):
                 continue
 
             img_path = os.path.join(dataset_dir.replace("labels", "images"),
-                                    file_name.split(".")[0]) + ".csv"
+                                    file_name.split(".")[0]) + ".bin"
             line = img_path + "\n"
             assert os.path.exists(img_path), "file:{} not exist!".format(img_path)
             w.write(line)
