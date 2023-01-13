@@ -2,3 +2,4 @@
 # exclude everything except directory foo/bar
 # !/my_dataset_doa
 my_dataset_doa/
+runs/
