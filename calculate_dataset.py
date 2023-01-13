@@ -39,30 +39,30 @@ def create_data_data(create_data_path, label_path, train_path, val_path, classes
         w.write("names=data/my_data_label.names" + "\n")        # 记录label.names文件路径
 
 
-def change_and_create_cfg_file(classes_info, save_cfg_path="./cfg/my_yolov3.cfg"):
-    # create my_yolov3.cfg file changed predictor filters and yolo classes param.
-    # this operation only deal with yolov3-spp.cfg
-    filters_lines = [636, 722, 809]
-    classes_lines = [643, 729, 816]
-    anchors_lines = [642, 728, 815]
-    new_anchors = "33,50,  33,100,  33,150,  65,50,  65,100,  65,150,  129,50,  129,100,  129,150"
-    cfg_lines = open(cfg_path, "r").readlines()
-
-    for i in filters_lines:
-        assert "filters" in cfg_lines[i-1], "filters param is not in line:{}".format(i-1)
-        output_num = (5 + len(classes_info)) * 3
-        cfg_lines[i-1] = "filters={}\n".format(output_num)
-
-    for i in classes_lines:
-        assert "classes" in cfg_lines[i-1], "classes param is not in line:{}".format(i-1)
-        cfg_lines[i-1] = "classes={}\n".format(len(classes_info))
-
-    for i in anchors_lines:
-        assert "anchors" in cfg_lines[i-1], "anchors param is not in line:{}".format(i-1)
-        cfg_lines[i-1] = "anchors = {}\n".format(new_anchors)
-
-    with open(save_cfg_path, "w") as w:
-        w.writelines(cfg_lines)
+# def change_and_create_cfg_file(classes_info, save_cfg_path="./cfg/my_yolov3.cfg"):
+#     # create my_yolov3.cfg file changed predictor filters and yolo classes param.
+#     # this operation only deal with yolov3-spp.cfg
+#     filters_lines = [636, 722, 809]
+#     classes_lines = [643, 729, 816]
+#     anchors_lines = [642, 728, 815]
+#     new_anchors = "33,50,  33,100,  33,150,  65,50,  65,100,  65,150,  129,50,  129,100,  129,150"
+#     cfg_lines = open(cfg_path, "r").readlines()
+#
+#     for i in filters_lines:
+#         assert "filters" in cfg_lines[i-1], "filters param is not in line:{}".format(i-1)
+#         output_num = (5 + len(classes_info)) * 3
+#         cfg_lines[i-1] = "filters={}\n".format(output_num)
+#
+#     for i in classes_lines:
+#         assert "classes" in cfg_lines[i-1], "classes param is not in line:{}".format(i-1)
+#         cfg_lines[i-1] = "classes={}\n".format(len(classes_info))
+#
+#     for i in anchors_lines:
+#         assert "anchors" in cfg_lines[i-1], "anchors param is not in line:{}".format(i-1)
+#         cfg_lines[i-1] = "anchors = {}\n".format(new_anchors)
+#
+#     with open(save_cfg_path, "w") as w:
+#         w.writelines(cfg_lines)
 
 
 def main():
@@ -77,7 +77,7 @@ def main():
     create_data_data("./data/my_data.data", classes_label, train_txt_path, val_txt_path, classes_info)
 
     # 根据yolov3-spp.cfg创建my_yolov3.cfg文件修改其中的predictor filters以及yolo classes参数(这两个参数是根据类别数改变的)
-    change_and_create_cfg_file(classes_info)
+    # change_and_create_cfg_file(classes_info)
 
 
 if __name__ == '__main__':
