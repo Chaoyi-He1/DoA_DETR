@@ -6,15 +6,13 @@ The script has 2 functions:
 
 import os
 
-train_annotation_dir = "./my_yolo_dataset/train/labels"
-val_annotation_dir = "./my_yolo_dataset/val/labels"
+train_annotation_dir = "./my_dataset_doa/train/labels"
+val_annotation_dir = "./my_dataset_doa/val/labels"
 classes_label = "./data/my_data_label.names"
-cfg_path = "./cfg/yolov3-spp.cfg"
 
 assert os.path.exists(train_annotation_dir), "train_annotation_dir not exist!"
 assert os.path.exists(val_annotation_dir), "val_annotation_dir not exist!"
 assert os.path.exists(classes_label), "classes_label not exist!"
-assert os.path.exists(cfg_path), "cfg_path not exist!"
 
 
 def calculate_data_txt(txt_path, dataset_dir):
