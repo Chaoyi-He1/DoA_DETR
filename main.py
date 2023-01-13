@@ -90,7 +90,7 @@ def get_args_parser():
     parser.add_argument('--world_size', default=4, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
-    parser.add_argument("--amp", default=False, help="Use torch.cuda.amp for mixed precision training")
+    parser.add_argument("--amp", default=True, help="Use torch.cuda.amp for mixed precision training")
     return parser
 
 
