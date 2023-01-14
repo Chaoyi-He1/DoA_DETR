@@ -47,8 +47,10 @@ def exif_size(img):
 
 
 def read_img_pickle(img_path, img_size):
-    with open(img_path, 'rb') as fo:
-        img = pickle.load(fo, encoding='bytes')
+    # with open(img_path, 'rb') as fo:
+    #     # img = pickle.load(fo, encoding='bytes')
+    #     img = fo.read()
+    img = np.fromfile(img_path, dtype=float).reshape(6144, 512)
     img = np.asarray(img, dtype=float)
     img = np.reshape(img, newshape=(-1, img_size, img_size)) if len(img.shape) != 3 else img
     return img
@@ -96,8 +98,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.mosaic = self.augment and mosaic  # load 4 images at a time into a mosaic (only during training)
 
         # Define labels
-        # (./my_yolo_dataset/train/images/2009_004012) -> (./my_yolo_dataset/train/labels/2009_004012.txt)
-        self.label_files = [x.replace("images", "labels") + ".txt" for x in self.img_files]
+        # (./my_yolo_dataset/train/images/2009_004012.bin) -> (./my_yolo_dataset/train/labels/2009_004012.txt)
+        self.label_files = [x.replace("images", "labels").replace(".bin", ".txt") for x in self.img_files]
 
         # Read image shapes (wh)
         sp = path.replace(".txt", ".shapes")  # shapefile -> "data/my_train_data.shapes" or "data/my_val_data.shapes"
@@ -361,8 +363,9 @@ def load_img_pickle(self, index):
     img = self.imgs[index]
     if img is None:  # not cached
         path = self.img_files[index]
-        with open(path, 'rb') as fo:
-            img = pickle.load(fo, encoding='bytes')
+        # with open(path, 'rb') as fo:
+        #     img = pickle.load(fo, encoding='bytes')
+        img = np.fromfile(path, dtype=float).reshape(6144, 512)
         img = np.asarray(img, dtype=float)
         img = np.reshape(img, newshape=(-1, img.shape[1], img.shape[1])).transpose(1, 2, 0) if len(img.shape) != 3 \
             else img.transpose(1, 2, 0)

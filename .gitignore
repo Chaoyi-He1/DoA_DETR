@@ -3,3 +3,5 @@
 # !/my_dataset_doa
 my_dataset_doa/
 runs/
+tmp.pk
+weights/

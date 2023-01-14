@@ -28,7 +28,7 @@ def convert_to_coco_api(ds):
             ann["image_id"] = img_idx
             # Convert relative coordinates to absolute coordinates
             # box (x, y, w, h)
-            boxes = obj[1:]
+            boxes = obj[1:5]
             # (x, y, w, h) to (xmin, ymin, w, h)
             boxes[:2] -= 0.5*boxes[2:]
             boxes[[0, 2]] *= img_dict["width"]

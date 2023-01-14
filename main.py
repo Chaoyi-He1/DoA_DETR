@@ -31,7 +31,7 @@ from util.util import check_file
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-3, type=float)
-    parser.add_argument('--lf', default=0.1, type=float)
+    parser.add_argument('--lf', default=0.01, type=float)
     parser.add_argument('--batch_size', default=2, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=300, type=int)
@@ -75,7 +75,7 @@ def get_args_parser():
 
     # dataset parameters
     parser.add_argument('--dataset_file', default='data/my_data.data')
-    parser.add_argument('--cache_images', default=True, help="cache images to RAM")
+    parser.add_argument('--cache_images', default=False, help="cache images to RAM")
     parser.add_argument('--output_dir', default='',
                         help='path where to save, empty for no saving')
     parser.add_argument('--seed', default=42, type=int)
@@ -199,9 +199,12 @@ def main(args, hyp):
     #     },
     # ]
     pg = [p for p in model.parameters() if p.requires_grad]
+
+    # After using DDP, the gradients on each device will be averaged, so the learning rate needs to be enlarged
+    args.lr *= max(1., args.world_size * args.batch_size / 64)
     optimizer = torch.optim.AdamW(pg, lr=args.lr,
                                   weight_decay=args.weight_decay)
-    lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - hyp["lrf"]) + hyp["lrf"]  # cosine
+    lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lf) + args.lf  # cosine
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from
 
