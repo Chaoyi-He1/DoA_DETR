@@ -282,7 +282,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                     labels[:, 2] = 1 - labels[:, 2]  # 1 - y_center
 
         labels_out = {
-            "image_id": index,
+            "image_id": torch.as_tensor(index),
             "orig_size": torch.as_tensor([int(h0), int(w0)]) if not self.mosaic else
             torch.as_tensor([int(self.img_size), int(self.img_size)]),
             "size": torch.as_tensor([int(h), int(w)]) if not self.mosaic else
@@ -290,9 +290,9 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         }
         if nL:
             labels_out.update({
-                "labels": labels[:, 0],
-                "boxes": labels[:, 1:5],
-                "directions": labels[:, 5:7]
+                "labels": torch.as_tensor(labels[:, 0]),
+                "boxes": torch.as_tensor(labels[:, 1:5]),
+                "directions": torch.as_tensor(labels[:, 5:7])
             })
 
         # Convert HWC to CHW(3kx512x512)

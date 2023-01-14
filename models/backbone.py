@@ -41,7 +41,7 @@ class DarkNet(nn.Module):
         super(DarkNet, self).__init__()
         self.img_size = args.img_size
         self.channels = 32
-        self.cov_1 = Convolutional(img_channel=3, filters=self.channels, size=3, stride=1)
+        self.cov_1 = Convolutional(img_channel=args.img_channel, filters=self.channels, size=3, stride=1)
         self.cov_2 = Convolutional(img_channel=self.channels, filters=self.channels * 2, size=3, stride=2)
         self.channels *= 2
         self.img_size /= 2
