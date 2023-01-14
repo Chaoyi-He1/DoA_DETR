@@ -299,7 +299,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         img = img[:, :, :].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
 
-        return torch.from_numpy(img), labels_out, self.img_files[index], shapes, index
+        return torch.from_numpy(img).float(), labels_out, self.img_files[index], shapes, index
 
     def coco_index(self, index):
         """
