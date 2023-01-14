@@ -29,7 +29,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     header = 'Epoch: [{}]'.format(epoch)
     print_freq = 10
 
-    for i, samples, targets, path, shapes, img_index in \
+    for i, (samples, targets, path, shapes, img_index) in \
             enumerate(metric_logger.log_every(data_loader, print_freq, header)):
         ni = i + nb * epoch  # number integrated batches (since train start)
         samples = samples.to(device)
