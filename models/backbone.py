@@ -45,19 +45,20 @@ class DarkNet(nn.Module):
         self.cov_2 = Convolutional(img_channel=self.channels, filters=self.channels * 2, size=3, stride=2)
         self.channels *= 2
         self.img_size /= 2
-        self.res_net = []
-        self.num_res_blocks = [1, 2, 8, 8, 4]
-        for i, res_block in enumerate(self.num_res_blocks):
+        self.res_net = nn.ModuleList()
+        num_res_blocks = [1, 2, 8, 8, 4]
+        for i, res_block in enumerate(num_res_blocks):
             self.res_net.extend([Res_block(img_channel=self.channels) for _ in range(res_block)])
-            if i != len(self.num_res_blocks) - 1:
+            if i != len(num_res_blocks) - 1:
                 self.res_net.append(Convolutional(img_channel=self.channels, filters=self.channels * 2, size=3,
                                                   stride=2))
                 self.channels *= 2
                 self.img_size /= 2
-        self.res_net = nn.Sequential(*self.res_net)
-        self.max_pool_5 = nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2)
-        self.max_pool_9 = nn.MaxPool2d(kernel_size=9, stride=1, padding=(9 - 1) // 2)
-        self.max_pool_13 = nn.MaxPool2d(kernel_size=13, stride=1, padding=(13 - 1) // 2)
+        # self.res_net = nn.Sequential(*self.res_net)
+        max_pool_5 = nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2)
+        max_pool_9 = nn.MaxPool2d(kernel_size=9, stride=1, padding=(9 - 1) // 2)
+        max_pool_13 = nn.MaxPool2d(kernel_size=13, stride=1, padding=(13 - 1) // 2)
+        self.spp = nn.ModuleList([max_pool_5, max_pool_9, max_pool_13])
         self.channels *= 4
 
     def forward(self, inputs):
@@ -65,12 +66,17 @@ class DarkNet(nn.Module):
         outputs = inputs
         outputs = self.cov_1(outputs)
         outputs = self.cov_2(outputs)
-        outputs = self.res_net(outputs)
+        for layer in self.res_net:
+            outputs = layer(outputs)
 
-        outputs_5 = self.max_pool_5(outputs)
-        outputs_9 = self.max_pool_9(outputs)
-        outputs_13 = self.max_pool_13(outputs)
-        outputs = torch.cat([outputs, outputs_5, outputs_9, outputs_13], dim=1)
+        # outputs_5 = self.max_pool_5(outputs)
+        # outputs_9 = self.max_pool_9(outputs)
+        # outputs_13 = self.max_pool_13(outputs)
+        spp_out = [outputs]
+        for max_pool in self.spp:
+            temp = max_pool(outputs)
+            spp_out.append(max_pool(outputs))
+        outputs = torch.cat(spp_out, dim=1)
         return outputs
 
 
