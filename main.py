@@ -91,7 +91,7 @@ def get_args_parser():
     parser.add_argument('--world_size', default=4, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
-    parser.add_argument("--amp", default=True, help="Use torch.cuda.amp for mixed precision training")
+    parser.add_argument("--amp", default=False, help="Use torch.cuda.amp for mixed precision training")
     return parser
 
 
@@ -114,7 +114,7 @@ def main(args, hyp):
     utils.init_distributed_mode(args)
     if args.rank in [-1, 0]:
         print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-        tb_writer = SummaryWriter(comment=args.name)
+        # tb_writer = SummaryWriter(comment=args.name)
 
     print("git:\n  {}\n".format(utils.get_sha()))
     print(args)
@@ -146,15 +146,6 @@ def main(args, hyp):
     model.to(device)
     accumulate = max(round(64 / (args.world_size * args.batch_size)), 1)
 
-    model_without_ddp = model
-    if args.distributed:
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-        model_without_ddp = model.module
-
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print('number of params:', n_parameters)
-    model_info(model)
-
     start_epoch = 0
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
     # If pretrained weights are specified, load pretrained weights
@@ -184,52 +175,58 @@ def main(args, hyp):
             scaler.load_state_dict(ckpt["scaler"])
         del ckpt
 
+    
     # Whether to freeze the weights and only train the weights of the Transformer
     if args.freeze_layers:
         for n, p in model.named_parameters():
             if "backbone" in n:
                 p.requires_grad_(False)
 
-    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+    model_without_ddp = model
+    if args.distributed:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+        model.to(device)
+        model_without_ddp = model.module
 
-    # param_dicts = [
-    #     {"params": [p for n, p in model_without_ddp.named_parameters() if "backbone" not in n and p.requires_grad]},
-    #     {
-    #         "params": [p for n, p in model_without_ddp.named_parameters() if "backbone" in n and p.requires_grad],
-    #         "lr": args.lr_backbone,
-    #     },
-    # ]
+    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('number of params:', n_parameters)
+    model_info(model)
+    for name, param in model.named_parameters():
+        if param.is_sparse:
+            print(f"{name} is a sparse tensor")
+
     pg = [p for p in model.parameters() if p.requires_grad]
 
     # After using DDP, the gradients on each device will be averaged, so the learning rate needs to be enlarged
     args.lr *= max(1., args.world_size * args.batch_size / 64)
-    optimizer = torch.optim.AdamW(pg, lr=args.lr,
-                                  weight_decay=args.weight_decay)
+    optimizer = torch.optim.SGD(pg, lr=args.lr,
+                                weight_decay=args.weight_decay)
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lf) + args.lf  # cosine
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from
 
     # dataset generate
-    with torch_distributed_zero_first(args.rank):
-        dataset_train = LoadImagesAndLabels(path=train_path,
-                                            img_size=args.img_size,
-                                            batch_size=args.batch_size,
-                                            augment=False,
-                                            hyp=hyp,  # augmentation hyper-parameters
-                                            cache_images=args.cache_images,
-                                            rank=args.rank)
-        # The image size of the validation set is specified as img_size(512)
-        dataset_val = LoadImagesAndLabels(path=test_path,
-                                          img_size=args.img_size,
-                                          batch_size=args.batch_size,
-                                          augment=False,
-                                          hyp=hyp,  # augmentation hyper-parameters
-                                          cache_images=args.cache_images,
-                                          rank=args.rank)
+    # with torch_distributed_zero_first(args.rank):
+    dataset_train = LoadImagesAndLabels(path=train_path,
+                                        img_size=args.img_size,
+                                        batch_size=args.batch_size,
+                                        augment=False,
+                                        hyp=hyp,  # augmentation hyper-parameters
+                                        cache_images=args.cache_images,
+                                        rank=args.rank)
+    # The image size of the validation set is specified as img_size(512)
+    dataset_val = LoadImagesAndLabels(path=test_path,
+                                        img_size=args.img_size,
+                                        batch_size=args.batch_size,
+                                        augment=False,
+                                        hyp=hyp,  # augmentation hyper-parameters
+                                        cache_images=args.cache_images,
+                                        rank=args.rank)
 
     if args.distributed:
-        sampler_train = DistributedSampler(dataset_train)
-        sampler_val = DistributedSampler(dataset_val, shuffle=False)
+        sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
+        sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
     else:
         sampler_train = torch.utils.data.RandomSampler(dataset_train)
         sampler_val = torch.utils.data.SequentialSampler(dataset_val)
@@ -240,22 +237,22 @@ def main(args, hyp):
     nw = min([os.cpu_count(), args.batch_size if args.batch_size > 1 else 0, 8])  # number of workers
     if args.rank in [-1, 0]:
         print('Using %g dataloader workers' % nw)
-    data_loader_train = DataLoader(dataset_train, batch_sampler=batch_sampler_train,
-                                   collate_fn=utils.collate_fn, pin_memory=True, num_workers=nw)
-    data_loader_val = DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
-                                 drop_last=False, collate_fn=utils.collate_fn, pin_memory=True, num_workers=nw)
+    data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_sampler=batch_sampler_train,
+                                                    collate_fn=utils.collate_fn, num_workers=nw)
+    data_loader_val = torch.utils.data.DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
+                                                  drop_last=False, collate_fn=utils.collate_fn, num_workers=nw)
 
     # base_ds = get_coco_api_from_dataset(dataset_val)
     # start training
     # caching val_data when you have plenty of memory(RAM)
-    with torch_distributed_zero_first(args.rank):
-        if os.path.exists("tmp.pk") is False:
-            base_ds = get_coco_api_from_dataset(dataset_val)
-            with open("tmp.pk", "wb") as f:
-                pickle.dump(base_ds, f)
-        else:
-            with open("tmp.pk", "rb") as f:
-                base_ds = pickle.load(f)
+    # with torch_distributed_zero_first(args.rank):
+    if os.path.exists("tmp.pk") is False:
+        base_ds = get_coco_api_from_dataset(dataset_val)
+        with open("tmp.pk", "wb") as f:
+            pickle.dump(base_ds, f)
+    else:
+        with open("tmp.pk", "rb") as f:
+            base_ds = pickle.load(f)
 
     output_dir = Path(args.output_dir)
 
@@ -277,7 +274,7 @@ def main(args, hyp):
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(model=model, criterion=criterion, data_loader=data_loader_train,
                                       optimizer=optimizer, device=device, epoch=epoch, accumulate=accumulate,
-                                      max_norm=args.clip_max_norm, warmup=True, scaler=scaler)
+                                      max_norm=args.clip_max_norm, warmup=False, scaler=scaler)
         lr_scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
