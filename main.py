@@ -12,12 +12,10 @@ from pathlib import Path
 import yaml
 import torch
 import numpy as np
-from torch.utils.data import DataLoader, DistributedSampler
 from util.distributed_utils import torch_distributed_zero_first
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
 
-import datasets
 import util.misc as utils
 from datasets import parse_data_cfg
 from datasets.Dataset_cls import LoadImagesAndLabels
@@ -53,7 +51,7 @@ def get_args_parser():
     parser.add_argument('--hyp', type=str, default='cfg/cfg.yaml', help='hyperparameters path')
 
     # Loss
-    parser.add_argument('--no_aux_loss', dest='aux_loss', action='store_false',
+    parser.add_argument('--no_aux_loss', dest='aux_loss', action='store_true',
                         help="Disables auxiliary decoding losses (loss at each layer)")
     # * Matcher
     parser.add_argument('--set_cost_class', default=1, type=float,
@@ -84,13 +82,13 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=4, type=int)
+    parser.add_argument('--num_workers', default=2, type=int)
 
     # distributed training parameters
     parser.add_argument('--savebest', type=bool, default=False, help='only save best checkpoint')
-    parser.add_argument('--world_size', default=4, type=int,
+    parser.add_argument('--world_size', default=2, type=int,
                         help='number of distributed processes')
-    parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
+    parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument("--amp", default=False, help="Use torch.cuda.amp for mixed precision training")
     return parser
 
@@ -102,7 +100,7 @@ def model_info(model):
 
     try:  # FLOPS
         from thop import profile
-        macs, _ = profile(model, inputs=(torch.zeros(1, 3, 512, 512),), verbose=False)
+        macs, _ = profile(model, inputs=(torch.zeros(1, 12, 512, 512),), verbose=False)
         fs = ', %.1f GFLOPS' % (macs / 1E9 * 2)
     except:
         fs = ''
@@ -116,7 +114,7 @@ def main(args, hyp):
         print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
         # tb_writer = SummaryWriter(comment=args.name)
 
-    print("git:\n  {}\n".format(utils.get_sha()))
+    # print("git:\n  {}\n".format(utils.get_sha()))
     print(args)
 
     device = torch.device(args.device)

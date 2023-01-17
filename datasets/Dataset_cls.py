@@ -298,8 +298,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Convert HWC to CHW(3kx512x512)
         img = img[:, :, :].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
-        # return torch.rand(12, 512, 512), labels_out, self.img_files[index], shapes, index
-        return torch.from_numpy(img), labels_out, self.img_files[index], shapes, index
+        return torch.rand(12, 512, 512, dtype=torch.float), labels_out, self.img_files[index], shapes, index
+        # return torch.from_numpy(img), labels_out, self.img_files[index], shapes, index
 
     def coco_index(self, index):
         """

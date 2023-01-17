@@ -14,6 +14,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
     model.train()
     criterion.train()
 
+    for name, param in model.named_parameters():
+        if param.is_sparse:
+            print(f"{name} is a sparse tensor")
+
     lr_scheduler = None
     if epoch == 0 and warmup is True:  # 当训练第一轮（epoch=0）时，启用warmup训练方式，可理解为热身训练
         warmup_factor = 1.0 / 1000

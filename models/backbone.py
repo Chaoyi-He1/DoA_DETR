@@ -11,14 +11,14 @@ class Convolutional(nn.Module):
         # type: (int, int, int, int) -> None
         super(Convolutional, self).__init__()
         self.conv = nn.Conv2d(in_channels=img_channel, out_channels=filters, kernel_size=(size, size),
-                              stride=(stride, stride), padding=size // 2, bias=False)
+                              stride=(stride, stride), padding=size // 2, bias=True)
         self.bn = nn.BatchNorm2d(num_features=filters)
 
     def forward(self, inputs):
         # type: (Tensor) -> Tensor
         outputs = self.conv(inputs)
         outputs = self.bn(outputs)
-        return F.leaky_relu(outputs)
+        return F.leaky_relu(outputs, inplace=True)
 
 
 class Res_block(nn.Module):

@@ -289,7 +289,7 @@ class NestedTensor(object):
 
     def to(self, device):
         # type: (Device) -> NestedTensor # noqa
-        cast_tensor = self.tensors.to(device)
+        cast_tensor = self.tensors.to(device).float()
         mask = self.mask
         if mask is not None:
             assert mask is not None
