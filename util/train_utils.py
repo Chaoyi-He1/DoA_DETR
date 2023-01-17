@@ -10,6 +10,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, accumulate: int, max_norm: float = 0,
                     warmup=False, scaler=None):
+    # model.to(device)
     model.train()
     criterion.train()
 
@@ -34,7 +35,6 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         ni = i + nb * epoch  # number integrated batches (since train start)
         samples = samples.to(device)
         targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-
         # with amp.autocast(enabled=scaler is not None):
         outputs = model(samples)
         loss_dict = criterion(outputs, targets)
