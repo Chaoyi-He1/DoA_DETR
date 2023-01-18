@@ -55,10 +55,9 @@ class DarkNet(nn.Module):
                 self.channels *= 2
                 self.img_size /= 2
         # self.res_net = nn.Sequential(*self.res_net)
-        max_pool_5 = nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2)
-        max_pool_9 = nn.MaxPool2d(kernel_size=9, stride=1, padding=(9 - 1) // 2)
-        max_pool_13 = nn.MaxPool2d(kernel_size=13, stride=1, padding=(13 - 1) // 2)
-        self.spp = nn.ModuleList([max_pool_5, max_pool_9, max_pool_13])
+        self.spp = nn.ModuleList([nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2), 
+                                  nn.MaxPool2d(kernel_size=9, stride=1, padding=(9 - 1) // 2), 
+                                  nn.MaxPool2d(kernel_size=13, stride=1, padding=(13 - 1) // 2)])
         self.channels *= 4
 
     def forward(self, inputs):
@@ -72,11 +71,12 @@ class DarkNet(nn.Module):
         # outputs_5 = self.max_pool_5(outputs)
         # outputs_9 = self.max_pool_9(outputs)
         # outputs_13 = self.max_pool_13(outputs)
-        spp_out = [outputs]
-        for max_pool in self.spp:
+        # spp_out = [outputs] 
+        for i, max_pool in enumerate(self.spp):
+            temp = self.spp[i](inputs)
             temp = max_pool(outputs)
-            spp_out.append(max_pool(outputs))
-        outputs = torch.cat(spp_out, dim=1)
+            # spp_out.append(max_pool(outputs))
+        # outputs = torch.cat(spp_out, dim=1)
         return outputs
 
 

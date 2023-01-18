@@ -298,8 +298,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         # Convert HWC to CHW(3kx512x512)
         img = img[:, :, :].transpose(2, 0, 1)
         img = np.ascontiguousarray(img)
-        return torch.rand(12, 512, 512, dtype=torch.float), labels_out, self.img_files[index], shapes, index
-        # return torch.from_numpy(img), labels_out, self.img_files[index], shapes, index
+        return torch.as_tensor(img).float().contiguous(), labels_out, self.img_files[index], shapes, index
 
     def coco_index(self, index):
         """
@@ -365,9 +364,9 @@ def load_img_pickle(self, index):
         path = self.img_files[index]
         # with open(path, 'rb') as fo:
         #     img = pickle.load(fo, encoding='bytes')
-        img = np.fromfile(path, dtype=float).reshape(6144, 512)
-        img = np.asarray(img, dtype=float)
-        img = np.reshape(img, newshape=(-1, img.shape[1], img.shape[1])).transpose(1, 2, 0) if len(img.shape) != 3 \
+        img = np.fromfile(path, dtype=float).reshape(-1, 512)
+        # img = np.asarray(img, dtype=float)
+        img = np.reshape(img, newshape=(-1, self.img_size, self.img_size)).transpose(1, 2, 0) if len(img.shape) != 3 \
             else img.transpose(1, 2, 0)
         assert img is not None, "Image Not Found " + path
         h0, w0 = img.shape[:2]  # orig hw

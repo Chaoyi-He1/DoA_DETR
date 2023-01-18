@@ -174,7 +174,7 @@ class SetCriterion(nn.Module):
 
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection """
-    def __init__(self, backbone, transformer, num_classes, num_queries):
+    def __init__(self, backbone, transformer, num_classes, num_queries, verbose=False):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -193,6 +193,7 @@ class DETR(nn.Module):
         self.query_embed = nn.Embedding(num_queries, hidden_dim)
         self.input_proj = nn.Conv2d(backbone.num_channels, hidden_dim, kernel_size=(1, 1))
         self.backbone = backbone
+        # self.info(verbose)
 
     def forward(self, samples: NestedTensor):
         """ The forward expects a NestedTensor, which consists of:
@@ -224,6 +225,13 @@ class DETR(nn.Module):
         outputs_direction = self.direction_embed(hs).sigmoid()
         out = {'pred_logits': outputs_class, 'pred_boxes': outputs_coord, 'pred_directions': outputs_direction}
         return out
+    
+    def info(self, verbose=False):
+        """
+        :param verbose:
+        :return:
+        """
+        model_info(self, verbose)
 
 
 class PostProcess(nn.Module):
@@ -268,7 +276,7 @@ def build(args, hyp):
     # you should pass `num_classes` to be 2 (max_obj_id + 1).
     # For more details on this, check the following discussion
     # https://github.com/facebookresearch/detr/issues/108#issuecomment-650269223
-    num_classes = 20 if args.dataset_file != 'coco' else 91
+    num_classes = 3 if args.dataset_file != 'coco' else 91
     if args.dataset_file == "coco_panoptic":
         # for panoptic, we just add a num_classes that is large enough to hold
         # max_obj_id + 1, but the exact value doesn't really matter
@@ -297,3 +305,24 @@ def build(args, hyp):
     postprocessors = {'bbox': PostProcess()}
 
     return model, criterion, postprocessors
+
+
+def model_info(model, verbose=False):
+    # Plots a line-by-line description of a PyTorch model
+    n_p = sum(x.numel() for x in model.parameters())  # number parameters
+    n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
+    if verbose:
+        print('%5s %40s %9s %12s %20s %10s %10s' % ('layer', 'name', 'gradient', 'parameters', 'shape', 'mu', 'sigma'))
+        for i, (name, p) in enumerate(model.named_parameters()):
+            name = name.replace('module_list.', '')
+            print('%5g %40s %9s %12g %20s %10.3g %10.3g' %
+                  (i, name, p.requires_grad, p.numel(), list(p.shape), p.mean(), p.std()))
+
+    try:  # FLOPS
+        from thop import profile
+        macs, _ = profile(model, inputs=(torch.zeros(1, 3, 480, 640),), verbose=False)
+        fs = ', %.1f GFLOPS' % (macs / 1E9 * 2)
+    except:
+        fs = ''
+
+    print('Model Summary: %g layers, %g parameters, %g gradients%s' % (len(list(model.parameters())), n_p, n_g, fs))

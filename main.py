@@ -8,9 +8,11 @@ import random
 import time
 import pickle
 from pathlib import Path
+import tempfile
 
 import yaml
 import torch
+import torch.distributed as dist
 import numpy as np
 from util.distributed_utils import torch_distributed_zero_first
 from torch.utils.tensorboard import SummaryWriter
@@ -89,23 +91,8 @@ def get_args_parser():
     parser.add_argument('--world_size', default=2, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
-    parser.add_argument("--amp", default=False, help="Use torch.cuda.amp for mixed precision training")
+    parser.add_argument("--amp", default=True, help="Use torch.cuda.amp for mixed precision training")
     return parser
-
-
-def model_info(model):
-    # Plots a line-by-line description of a PyTorch model
-    n_p = sum(x.numel() for x in model.parameters())  # number parameters
-    n_g = sum(x.numel() for x in model.parameters() if x.requires_grad)  # number gradients
-
-    try:  # FLOPS
-        from thop import profile
-        macs, _ = profile(model, inputs=(torch.zeros(1, 12, 512, 512),), verbose=False)
-        fs = ', %.1f GFLOPS' % (macs / 1E9 * 2)
-    except:
-        fs = ''
-
-    print('Model Summary: %g layers, %g parameters, %g gradients%s' % (len(list(model.parameters())), n_p, n_g, fs))
 
 
 def main(args, hyp):
@@ -172,6 +159,12 @@ def main(args, hyp):
         if args.amp and "scaler" in ckpt:
             scaler.load_state_dict(ckpt["scaler"])
         del ckpt
+    else:
+        checkpoint_path = os.path.join(tempfile.gettempdir(), "initial_weights.pt")
+        if args.rank in [-1, 0]:
+            torch.save(model.state_dict(), checkpoint_path)
+        dist.barrier()
+        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
 
     
     # Whether to freeze the weights and only train the weights of the Transformer
@@ -180,19 +173,15 @@ def main(args, hyp):
             if "backbone" in n:
                 p.requires_grad_(False)
 
-    model_without_ddp = model
-    if args.distributed:
-        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
-        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-        model.to(device)
-        model_without_ddp = model.module
+    # model_without_ddp = model
+    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+    # model.to(device)
+    # model_without_ddp = model.module
 
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
-    model_info(model)
-    for name, param in model.named_parameters():
-        if param.is_sparse:
-            print(f"{name} is a sparse tensor")
+    # model_info(model)
 
     pg = [p for p in model.parameters() if p.requires_grad]
 
@@ -205,29 +194,29 @@ def main(args, hyp):
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from
 
     # dataset generate
-    # with torch_distributed_zero_first(args.rank):
-    dataset_train = LoadImagesAndLabels(path=train_path,
-                                        img_size=args.img_size,
-                                        batch_size=args.batch_size,
-                                        augment=False,
-                                        hyp=hyp,  # augmentation hyper-parameters
-                                        cache_images=args.cache_images,
-                                        rank=args.rank)
-    # The image size of the validation set is specified as img_size(512)
-    dataset_val = LoadImagesAndLabels(path=test_path,
-                                        img_size=args.img_size,
-                                        batch_size=args.batch_size,
-                                        augment=False,
-                                        hyp=hyp,  # augmentation hyper-parameters
-                                        cache_images=args.cache_images,
-                                        rank=args.rank)
+    with torch_distributed_zero_first(args.rank):
+        dataset_train = LoadImagesAndLabels(path=train_path,
+                                            img_size=args.img_size,
+                                            batch_size=args.batch_size,
+                                            augment=False,
+                                            hyp=hyp,  # augmentation hyper-parameters
+                                            cache_images=args.cache_images,
+                                            rank=args.rank)
+        # The image size of the validation set is specified as img_size(512)
+        dataset_val = LoadImagesAndLabels(path=test_path,
+                                            img_size=args.img_size,
+                                            batch_size=args.batch_size,
+                                            augment=False,
+                                            hyp=hyp,  # augmentation hyper-parameters
+                                            cache_images=args.cache_images,
+                                            rank=args.rank)
 
-    if args.distributed:
-        sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
-        sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
-    else:
-        sampler_train = torch.utils.data.RandomSampler(dataset_train)
-        sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+    # if args.distributed:
+    sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
+    sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
+    # else:
+    #     sampler_train = torch.utils.data.RandomSampler(dataset_train)
+    #     sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
     batch_sampler_train = torch.utils.data.BatchSampler(sampler_train, args.batch_size, drop_last=True)
 
@@ -236,21 +225,21 @@ def main(args, hyp):
     if args.rank in [-1, 0]:
         print('Using %g dataloader workers' % nw)
     data_loader_train = torch.utils.data.DataLoader(dataset_train, batch_sampler=batch_sampler_train,
-                                                    collate_fn=utils.collate_fn, num_workers=nw)
+                                                    collate_fn=dataset_train.collate_fn, num_workers=nw)
     data_loader_val = torch.utils.data.DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
-                                                  drop_last=False, collate_fn=utils.collate_fn, num_workers=nw)
+                                                  drop_last=False, collate_fn=dataset_val.collate_fn, num_workers=nw)
 
     # base_ds = get_coco_api_from_dataset(dataset_val)
     # start training
     # caching val_data when you have plenty of memory(RAM)
-    # with torch_distributed_zero_first(args.rank):
-    if os.path.exists("tmp.pk") is False:
-        base_ds = get_coco_api_from_dataset(dataset_val)
-        with open("tmp.pk", "wb") as f:
-            pickle.dump(base_ds, f)
-    else:
-        with open("tmp.pk", "rb") as f:
-            base_ds = pickle.load(f)
+    with torch_distributed_zero_first(args.rank):
+        if os.path.exists("tmp.pk") is False:
+            base_ds = get_coco_api_from_dataset(dataset_val)
+            with open("tmp.pk", "wb") as f:
+                pickle.dump(base_ds, f)
+        else:
+            with open("tmp.pk", "rb") as f:
+                base_ds = pickle.load(f)
 
     output_dir = Path(args.output_dir)
 
@@ -281,7 +270,7 @@ def main(args, hyp):
                 checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
             for checkpoint_path in checkpoint_paths:
                 utils.save_on_master({
-                    'model': model_without_ddp.state_dict(),
+                    'model': model.module.state_dict(),
                     'optimizer': optimizer.state_dict(),
                     'lr_scheduler': lr_scheduler.state_dict(),
                     'epoch': epoch,
