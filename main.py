@@ -132,7 +132,7 @@ def main(args, hyp):
     accumulate = max(round(64 / (args.world_size * args.batch_size)), 1)
     if args.rank in [-1, 0] and tb_writer:
         tb_writer.add_graph(model, torch.rand((1, args.img_channel, args.img_size, args.img_size), 
-                                              device=device, dtype=torch.float))
+                                              device=device, dtype=torch.float), use_strict_trace=False)
 
     start_epoch = 0
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
