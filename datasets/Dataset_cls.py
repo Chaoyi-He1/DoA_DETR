@@ -290,7 +290,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         }
         if nL:
             labels_out.update({
-                "labels": torch.as_tensor(labels[:, 0]),
+                "labels": torch.as_tensor(labels[:, 0]).long(),
                 "boxes": torch.as_tensor(labels[:, 1:5]),
                 "directions": torch.as_tensor(labels[:, 5:7])
             })

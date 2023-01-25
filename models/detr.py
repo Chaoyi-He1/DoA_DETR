@@ -197,7 +197,7 @@ class DETR(nn.Module):
 
     def forward(self, samples: NestedTensor):
         """ The forward expects a NestedTensor, which consists of:
-               - samples.tensor: batched images, of shape [batch_size x 3 x H x W]
+               - samples.tensor: batched images, of shape [batch_size x 12 x H x W]
                - samples.mask: a binary mask of shape [batch_size x H x W], containing 1 on padded pixels
 
             It returns a dict with the following elements:
@@ -218,12 +218,12 @@ class DETR(nn.Module):
 
         src, mask = features.decompose()
         assert mask is not None
-        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos[-1])[0]
+        hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos)[0]
 
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
         outputs_direction = self.direction_embed(hs).sigmoid()
-        out = {'pred_logits': outputs_class, 'pred_boxes': outputs_coord, 'pred_directions': outputs_direction}
+        out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1], 'pred_directions': outputs_direction[-1]}
         return out
     
     def info(self, verbose=False):
@@ -295,9 +295,9 @@ def build(args, hyp):
 
     matcher = build_matcher(args)
     weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef, 'loss_giou': args.giou_loss_coef,
-                   'loss_direction': args.direction_loss_coef}
+                   'loss_directions': args.direction_loss_coef}
 
-    losses = ['labels', 'boxes', 'cardinality']
+    losses = ['labels', 'boxes', 'cardinality', 'directions']
 
     criterion = SetCriterion(num_classes, matcher=matcher, weight_dict=weight_dict,
                              eos_coef=args.eos_coef, losses=losses)

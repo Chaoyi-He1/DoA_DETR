@@ -71,12 +71,10 @@ class DarkNet(nn.Module):
         # outputs_5 = self.max_pool_5(outputs)
         # outputs_9 = self.max_pool_9(outputs)
         # outputs_13 = self.max_pool_13(outputs)
-        # spp_out = [outputs] 
-        for i, max_pool in enumerate(self.spp):
-            temp = self.spp[i](inputs)
-            temp = max_pool(outputs)
-            # spp_out.append(max_pool(outputs))
-        # outputs = torch.cat(spp_out, dim=1)
+        spp_out = [outputs] 
+        for max_pool in self.spp:
+            spp_out.append(max_pool(outputs))
+        outputs = torch.cat(spp_out, dim=1)
         return outputs
 
 
@@ -92,7 +90,7 @@ class Joiner(nn.Sequential):
         mask = F.interpolate(m[None].float(), size=xs.shape[-2:]).to(torch.bool)[0]
         out = NestedTensor(xs, mask)
         # position encoding
-        pos = self[1](xs).to(xs.tensors.dtype)
+        pos = self[1](out).to(out.tensors.dtype)
 
         return out, pos
 

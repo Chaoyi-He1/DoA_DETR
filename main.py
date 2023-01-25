@@ -173,15 +173,13 @@ def main(args, hyp):
             if "backbone" in n:
                 p.requires_grad_(False)
 
-    # model_without_ddp = model
-    model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
-    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
-    # model.to(device)
-    # model_without_ddp = model.module
+    if args.distributed:
+        model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+        model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
 
     n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print('number of params:', n_parameters)
-    # model_info(model)
+    print('Model Summary: %g layers, %g parameters' % (len(list(model.parameters())), n_parameters))
 
     pg = [p for p in model.parameters() if p.requires_grad]
 
@@ -211,12 +209,12 @@ def main(args, hyp):
                                             cache_images=args.cache_images,
                                             rank=args.rank)
 
-    # if args.distributed:
-    sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
-    sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
-    # else:
-    #     sampler_train = torch.utils.data.RandomSampler(dataset_train)
-    #     sampler_val = torch.utils.data.SequentialSampler(dataset_val)
+    if args.distributed:
+        sampler_train = torch.utils.data.distributed.DistributedSampler(dataset_train)
+        sampler_val = torch.utils.data.distributed.DistributedSampler(dataset_val, shuffle=False)
+    else:
+        sampler_train = torch.utils.data.RandomSampler(dataset_train)
+        sampler_val = torch.utils.data.SequentialSampler(dataset_val)
 
     batch_sampler_train = torch.utils.data.BatchSampler(sampler_train, args.batch_size, drop_last=True)
 
@@ -229,7 +227,6 @@ def main(args, hyp):
     data_loader_val = torch.utils.data.DataLoader(dataset_val, args.batch_size, sampler=sampler_val,
                                                   drop_last=False, collate_fn=dataset_val.collate_fn, num_workers=nw)
 
-    # base_ds = get_coco_api_from_dataset(dataset_val)
     # start training
     # caching val_data when you have plenty of memory(RAM)
     with torch_distributed_zero_first(args.rank):
