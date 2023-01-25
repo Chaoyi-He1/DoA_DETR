@@ -32,7 +32,7 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-3, type=float)
     parser.add_argument('--lf', default=0.01, type=float)
-    parser.add_argument('--batch_size', default=16, type=int)
+    parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float, help='gradient clipping max norm')
@@ -84,11 +84,11 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=4, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
 
     # distributed training parameters
     parser.add_argument('--savebest', type=bool, default=False, help='only save best checkpoint')
-    parser.add_argument('--world_size', default=4, type=int,
+    parser.add_argument('--world_size', default=8, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument("--amp", default=True, help="Use torch.cuda.amp for mixed precision training")
@@ -99,7 +99,7 @@ def main(args, hyp):
     utils.init_distributed_mode(args)
     if args.rank in [-1, 0]:
         print('Start Tensorboard with "tensorboard --logdir=runs", view at http://localhost:6006/')
-        # tb_writer = SummaryWriter(comment=args.name)
+        tb_writer = SummaryWriter(comment=args.name)
 
     # print("git:\n  {}\n".format(utils.get_sha()))
     print(args)
@@ -130,6 +130,9 @@ def main(args, hyp):
     model, criterion, postprocessors = build_model(args, hyp)
     model.to(device)
     accumulate = max(round(64 / (args.world_size * args.batch_size)), 1)
+    if args.rank in [-1, 0] and tb_writer:
+        tb_writer.add_graph(model, torch.rand((1, args.img_channel, args.img_size, args.img_size), 
+                                              device=device, dtype=torch.float))
 
     start_epoch = 0
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
@@ -259,7 +262,7 @@ def main(args, hyp):
         train_stats = train_one_epoch(model=model, criterion=criterion, data_loader=data_loader_train,
                                       optimizer=optimizer, device=device, epoch=epoch, accumulate=accumulate,
                                       max_norm=args.clip_max_norm, warmup=False, scaler=scaler)
-        lr_scheduler.step()
+        scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs
@@ -285,6 +288,22 @@ def main(args, hyp):
         if args.output_dir and utils.is_main_process():
             with (output_dir / "log.txt").open("a") as f:
                 f.write(json.dumps(log_stats) + "\n")
+
+        if args.rank in [-1, 0] and tb_writer:
+            tags = ['train/giou_loss', 'train/bbox_loss', 'train/cls_loss', 'train/direction_loss', 'train/loss', 
+                    'test/giou_loss', 'test/obj_loss', 'test/cls_loss', 'test/direction_loss', 'test/loss', 
+                    "mAP@[IoU=0.50:0.95]", "mAP@[IoU=0.5]", "mAR@[IoU=0.50:0.95]", "learning_rate"]
+            coco_eval_res = log_stats['coco_eval_bbox']
+            coco_mAP = coco_eval_res[0]
+            voc_mAP = coco_eval_res[1]
+            coco_mAR = coco_eval_res[8]
+            values = [log_stats['train_loss_giou'], log_stats['train_loss_bbox'], log_stats['train_loss_ce'],
+                      log_stats['train_loss_directions'], log_stats['train_loss'], 
+                      log_stats['test_loss_giou'], log_stats['test_loss_bbox'], log_stats['test_loss_ce'],
+                      log_stats['test_loss_directions'], log_stats['test_loss'], 
+                      coco_mAP, voc_mAP, coco_mAR, log_stats['train_lr']]
+            for x, tag in zip(values, tags):
+                    tb_writer.add_scalar(tag, x, epoch)
 
             # for evaluation logs
             if coco_evaluator is not None:
