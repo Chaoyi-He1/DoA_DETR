@@ -32,7 +32,7 @@ def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
     parser.add_argument('--lr', default=1e-3, type=float)
     parser.add_argument('--lf', default=0.01, type=float)
-    parser.add_argument('--batch_size', default=64, type=int)
+    parser.add_argument('--batch_size', default=36, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=300, type=int)
     parser.add_argument('--clip_max_norm', default=0.1, type=float, help='gradient clipping max norm')
@@ -261,7 +261,7 @@ def main(args, hyp):
             sampler_train.set_epoch(epoch)
         train_stats = train_one_epoch(model=model, criterion=criterion, data_loader=data_loader_train,
                                       optimizer=optimizer, device=device, epoch=epoch, accumulate=accumulate,
-                                      max_norm=args.clip_max_norm, warmup=False, scaler=scaler)
+                                      max_norm=args.clip_max_norm, warmup=True, scaler=scaler)
         scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
@@ -293,7 +293,7 @@ def main(args, hyp):
             tags = ['train/giou_loss', 'train/bbox_loss', 'train/cls_loss', 'train/direction_loss', 'train/loss', 
                     'test/giou_loss', 'test/obj_loss', 'test/cls_loss', 'test/direction_loss', 'test/loss', 
                     "mAP@[IoU=0.50:0.95]", "mAP@[IoU=0.5]", "mAR@[IoU=0.50:0.95]", "learning_rate"]
-            coco_eval_res = log_stats['coco_eval_bbox']
+            coco_eval_res = log_stats['test_coco_eval_bbox']
             coco_mAP = coco_eval_res[0]
             voc_mAP = coco_eval_res[1]
             coco_mAR = coco_eval_res[8]
