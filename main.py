@@ -30,12 +30,12 @@ from util.util import check_file
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
-    parser.add_argument('--lr', default=1e-3, type=float)
+    parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lf', default=0.01, type=float)
     parser.add_argument('--batch_size', default=36, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
     parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--clip_max_norm', default=0.1, type=float, help='gradient clipping max norm')
+    parser.add_argument('--clip_max_norm', default=0.5, type=float, help='gradient clipping max norm')
     parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
@@ -69,8 +69,8 @@ def get_args_parser():
     parser.add_argument('--mask_loss_coef', default=1, type=float)
     parser.add_argument('--dice_loss_coef', default=1, type=float)
     parser.add_argument('--bbox_loss_coef', default=5, type=float)
-    parser.add_argument('--giou_loss_coef', default=2, type=float)
-    parser.add_argument('--direction_loss_coef', default=8, type=float)
+    parser.add_argument('--giou_loss_coef', default=5, type=float)
+    parser.add_argument('--direction_loss_coef', default=6, type=float)
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object class")
 
@@ -188,8 +188,8 @@ def main(args, hyp):
 
     # After using DDP, the gradients on each device will be averaged, so the learning rate needs to be enlarged
     args.lr *= max(1., args.world_size * args.batch_size / 64)
-    optimizer = torch.optim.SGD(pg, lr=args.lr,
-                                weight_decay=args.weight_decay)
+    optimizer = torch.optim.AdamW(pg, lr=args.lr,
+                                  weight_decay=args.weight_decay)
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lf) + args.lf  # cosine
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
     scheduler.last_epoch = start_epoch  # Specify which epoch to start from

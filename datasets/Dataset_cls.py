@@ -53,6 +53,7 @@ def read_img_pickle(img_path, img_size):
     img = np.fromfile(img_path, dtype=float).reshape(6144, 512)
     img = np.asarray(img, dtype=float)
     img = np.reshape(img, newshape=(-1, img_size, img_size)) if len(img.shape) != 3 else img
+    assert not (np.isnan(img)).any()
     return img
 
 

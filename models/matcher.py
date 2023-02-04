@@ -77,6 +77,10 @@ class HungarianMatcher(nn.Module):
         cost_bbox = torch.cdist(out_bbox, tgt_bbox, p=1)
 
         # Compute the giou cost betwen boxes
+        boxes1 = box_cxcywh_to_xyxy(out_bbox)
+        assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+        boxes2 = box_cxcywh_to_xyxy(tgt_bbox)
+        assert (boxes2[:, 2:] >= boxes2[:, :2]).all()
         cost_giou = -generalized_box_iou(box_cxcywh_to_xyxy(out_bbox), box_cxcywh_to_xyxy(tgt_bbox))
 
         # Compute the L1 cost between directions
