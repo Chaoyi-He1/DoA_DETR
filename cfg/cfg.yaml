@@ -6,7 +6,8 @@ nhead: 8
 num_encoder_layers: 6
 num_decoder_layers: 6
 dim_feedforward: 2048
-dropout: 0.1
+dropout: 0.4
+drop_path: 0.4
 activation: "relu"
 normalize_before: False
 return_intermediate_dec: False

@@ -6,6 +6,37 @@ from util.misc import *
 from .position_embedding import build_position_encoding
 
 
+def drop_path(x, drop_prob: float = 0., training: bool = False):
+    """
+    Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
+    This is the same as the DropConnect impl I created for EfficientNet, etc networks, however,
+    the original name is misleading as 'Drop Connect' is a different form of dropout in a separate paper...
+    See discussion: https://github.com/tensorflow/tpu/issues/494#issuecomment-532968956 ... I've opted for
+    changing the layer and argument names to 'drop path' rather than mix DropConnect as a layer name and use
+    'survival rate' as the argument.
+    """
+    if drop_prob == 0. or not training:
+        return x
+    keep_prob = 1 - drop_prob
+    shape = (x.shape[0],) + (1,) * (x.ndim - 1)  # work with diff dim tensors, not just 2D ConvNets
+    random_tensor = keep_prob + torch.rand(shape, dtype=x.dtype, device=x.device)
+    random_tensor.floor_()  # binarize
+    output = x.div(keep_prob) * random_tensor
+    return output
+
+
+class DropPath(nn.Module):
+    """
+    Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks).
+    """
+    def __init__(self, drop_prob=None):
+        super(DropPath, self).__init__()
+        self.drop_prob = drop_prob
+
+    def forward(self, x):
+        return drop_path(x, self.drop_prob, self.training)
+
+        
 class Convolutional(nn.Module):
     def __init__(self, img_channel, filters, size, stride):
         # type: (int, int, int, int) -> None
@@ -22,16 +53,18 @@ class Convolutional(nn.Module):
 
 
 class Res_block(nn.Module):
-    def __init__(self, img_channel):
-        # type: (int) -> None
+    def __init__(self, img_channel, drop_path_ratio):
+        # type: (int, float) -> None
         super(Res_block, self).__init__()
         self.conv_1 = Convolutional(img_channel, img_channel // 2, 1, 1)
         self.conv_3 = Convolutional(img_channel // 2, img_channel, 3, 1)
+        self.drop_path = DropPath(drop_prob=drop_path_ratio) if drop_path_ratio > 0. else nn.Identity()
 
     def forward(self, inputs):
         # type: (Tensor) -> Tensor
         outputs = self.conv_1(inputs)
         outputs = self.conv_3(outputs)
+        outputs = self.drop_path(outputs)
         return inputs + outputs
 
 
@@ -48,7 +81,8 @@ class DarkNet(nn.Module):
         self.res_net = nn.ModuleList()
         num_res_blocks = [1, 2, 8, 8, 4]
         for i, res_block in enumerate(num_res_blocks):
-            self.res_net.extend([Res_block(img_channel=self.channels) for _ in range(res_block)])
+            self.res_net.extend([Res_block(img_channel=self.channels, 
+                                           drop_path_ratio=args.drop_path_ratio) for _ in range(res_block)])
             if i != len(num_res_blocks) - 1:
                 self.res_net.append(Convolutional(img_channel=self.channels, filters=self.channels * 2, size=3,
                                                   stride=2))
