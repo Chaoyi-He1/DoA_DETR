@@ -48,6 +48,7 @@ def get_args_parser():
                         help='Freeze non-output layers')
     parser.add_argument('--img_size', type=int, default=512, help='Image size')
     parser.add_argument('--img_channel', type=int, default=12, help='Image channel')
+    parser.add_argument('--drop_path_ratio', type=int, default=0.4, help='Drop path ratio')
 
     # * Transformer
     parser.add_argument('--hyp', type=str, default='cfg/cfg.yaml', help='hyperparameters path')
