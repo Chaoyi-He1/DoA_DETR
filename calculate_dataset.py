@@ -6,8 +6,8 @@ The script has 2 functions:
 
 import os
 
-train_annotation_dir = "./my_dataset_doa/train/labels"
-val_annotation_dir = "./my_dataset_doa/val/labels"
+train_annotation_dir = "/data2/chaoyi/train/labels"
+val_annotation_dir = "/data2/chaoyi/val/labels"
 classes_label = "./data/my_data_label.names"
 
 assert os.path.exists(train_annotation_dir), "train_annotation_dir not exist!"
