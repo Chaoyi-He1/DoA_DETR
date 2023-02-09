@@ -85,11 +85,11 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=8, type=int)
+    parser.add_argument('--num_workers', default=16, type=int)
 
     # distributed training parameters
     parser.add_argument('--savebest', type=bool, default=False, help='only save best checkpoint')
-    parser.add_argument('--world_size', default=8, type=int,
+    parser.add_argument('--world_size', default=16, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument("--amp", default=True, help="Use torch.cuda.amp for mixed precision training")
