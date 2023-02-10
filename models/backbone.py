@@ -79,7 +79,7 @@ class DarkNet(nn.Module):
         self.channels *= 2
         self.img_size /= 2
         self.res_net = nn.ModuleList()
-        num_res_blocks = [1, 2, 8, 8, 4]
+        num_res_blocks = [1, 2, 4, 4, 2]
         for i, res_block in enumerate(num_res_blocks):
             self.res_net.extend([Res_block(img_channel=self.channels, 
                                            drop_path_ratio=args.drop_path_ratio) for _ in range(res_block)])
