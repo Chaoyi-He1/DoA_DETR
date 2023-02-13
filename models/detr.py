@@ -294,8 +294,8 @@ def build(args, hyp):
         num_queries=hyp["num_queries"])
 
     matcher = build_matcher(args)
-    weight_dict = {'loss_ce': 1, 'loss_bbox': args.bbox_loss_coef, 'loss_giou': args.giou_loss_coef,
-                   'loss_directions': args.direction_loss_coef}
+    weight_dict = {'loss_ce': args.dice_loss_coef, 'loss_bbox': args.bbox_loss_coef, 
+                   'loss_giou': args.giou_loss_coef, 'loss_directions': args.direction_loss_coef}
 
     losses = ['labels', 'boxes', 'cardinality', 'directions']
 

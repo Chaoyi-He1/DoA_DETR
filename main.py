@@ -17,6 +17,7 @@ import numpy as np
 from util.distributed_utils import torch_distributed_zero_first
 from torch.utils.tensorboard import SummaryWriter
 import torch.optim.lr_scheduler as lr_scheduler
+import torch.multiprocessing
 
 import util.misc as utils
 from datasets import parse_data_cfg
@@ -26,6 +27,9 @@ from models import build_model
 from util.eval_utils import evaluate
 from util.train_utils import train_one_epoch
 from util.util import check_file
+
+
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 def get_args_parser():
@@ -57,20 +61,20 @@ def get_args_parser():
     parser.add_argument('--no_aux_loss', dest='aux_loss', action='store_true',
                         help="Disables auxiliary decoding losses (loss at each layer)")
     # * Matcher
-    parser.add_argument('--set_cost_class', default=1, type=float,
+    parser.add_argument('--set_cost_class', default=3, type=float,
                         help="Class coefficient in the matching cost")
     parser.add_argument('--set_cost_bbox', default=5, type=float,
                         help="L1 box coefficient in the matching cost")
-    parser.add_argument('--set_cost_giou', default=2, type=float,
+    parser.add_argument('--set_cost_giou', default=4, type=float,
                         help="giou box coefficient in the matching cost")
-    parser.add_argument('--set_cost_direction', default=8, type=float,
+    parser.add_argument('--set_cost_direction', default=6, type=float,
                         help="direction coefficient in the matching cost")
 
     # * Loss coefficients
     parser.add_argument('--mask_loss_coef', default=1, type=float)
-    parser.add_argument('--dice_loss_coef', default=5, type=float)
+    parser.add_argument('--dice_loss_coef', default=3, type=float)
     parser.add_argument('--bbox_loss_coef', default=5, type=float)
-    parser.add_argument('--giou_loss_coef', default=5, type=float)
+    parser.add_argument('--giou_loss_coef', default=4, type=float)
     parser.add_argument('--direction_loss_coef', default=6, type=float)
     parser.add_argument('--eos_coef', default=0.1, type=float,
                         help="Relative classification weight of the no-object class")
@@ -85,11 +89,11 @@ def get_args_parser():
     parser.add_argument('--start_epoch', default=0, type=int, metavar='N',
                         help='start epoch')
     parser.add_argument('--eval', action='store_true')
-    parser.add_argument('--num_workers', default=16, type=int)
+    parser.add_argument('--num_workers', default=8, type=int)
 
     # distributed training parameters
     parser.add_argument('--savebest', type=bool, default=False, help='only save best checkpoint')
-    parser.add_argument('--world_size', default=16, type=int,
+    parser.add_argument('--world_size', default=8, type=int,
                         help='number of distributed processes')
     parser.add_argument('--dist-url', default='env://', help='url used to set up distributed training')
     parser.add_argument("--amp", default=True, help="Use torch.cuda.amp for mixed precision training")
