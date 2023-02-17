@@ -50,7 +50,7 @@ def read_img_pickle(img_path, img_size):
     # with open(img_path, 'rb') as fo:
     #     # img = pickle.load(fo, encoding='bytes')
     #     img = fo.read()
-    img = np.fromfile(img_path, dtype=float).reshape(6144, 512)
+    img = np.fromfile(img_path, dtype=np.float32).reshape(6144, 512)
     img = np.asarray(img, dtype=float)
     img = np.reshape(img, newshape=(-1, img_size, img_size)) if len(img.shape) != 3 else img
     assert not (np.isnan(img)).any()
@@ -369,7 +369,7 @@ def load_img_pickle(self, index):
         path = self.img_files[index]
         # with open(path, 'rb') as fo:
         #     img = pickle.load(fo, encoding='bytes')
-        img = np.fromfile(path, dtype=float).reshape(-1, 512)
+        img = np.fromfile(path, dtype=np.float32).reshape(-1, 512)
         # img = np.asarray(img, dtype=float)
         img = np.reshape(img, newshape=(-1, self.img_size, self.img_size)).transpose(1, 2, 0) if len(img.shape) != 3 \
             else img.transpose(1, 2, 0)
