@@ -117,11 +117,8 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
                 image_files = tqdm(self.img_files, desc="Reading image shapes")
             else:
                 image_files = self.img_files
-            # s = [read_img_pickle(f, self.img_size).shape for f in image_files]
-            for f in image_files:
-                shape = read_img_pickle(f, self.img_size).shape
-                break
-            s = [(12, 512, 512) for _ in image_files]
+            s = [read_img_pickle(f, self.img_size).shape for f in image_files]
+            # s = [(12, 512, 512) for _ in image_files]
             # s = [exif_size(Image.open(f)) for f in image_files]
             # Save the shape information of all images in a .shape file
             np.savetxt(sp, s, fmt="%g")  # overwrite existing (if any)
