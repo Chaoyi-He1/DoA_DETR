@@ -34,7 +34,7 @@ torch.multiprocessing.set_sharing_strategy('file_system')
 
 def get_args_parser():
     parser = argparse.ArgumentParser('Set transformer detector', add_help=False)
-    parser.add_argument('--lr', default=1e-5, type=float)
+    parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lf', default=0.01, type=float)
     parser.add_argument('--batch_size', default=36, type=int)
     parser.add_argument('--weight_decay', default=1e-4, type=float)
