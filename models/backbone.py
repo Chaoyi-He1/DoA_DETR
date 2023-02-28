@@ -109,7 +109,6 @@ class DarkNet(nn.Module):
         for max_pool in self.spp:
             spp_out.append(max_pool(outputs))
         outputs = torch.cat(spp_out, dim=1)
-        assert not torch.isnan(outputs).any()
         return outputs
 
 

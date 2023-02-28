@@ -221,7 +221,6 @@ class Transformer_Encoder(nn.Module):
         for i, layer in enumerate(self.layers):
             output = layer(output, src_mask=mask,
                            src_key_padding_mask=src_key_padding_mask, pos=pos)
-            assert not torch.isnan(output).any()
         if self.norm is not None:
             output = self.norm(output)
 
@@ -317,10 +316,8 @@ class Transformer(nn.Module):
 
         tgt = torch.zeros_like(query_embed)
         memory = self.encoder(src, src_key_padding_mask=mask, pos=pos_embed)
-        assert not torch.isnan(memory).any()
         hs = self.decoder(tgt, memory, memory_key_padding_mask=mask,
                           pos=pos_embed, query_pos=query_embed)
-        assert not torch.isnan(hs).any()
         return hs, memory.view(bs, c, h, w)
 
 

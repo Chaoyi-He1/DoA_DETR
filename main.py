@@ -44,7 +44,7 @@ def get_args_parser():
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
     # Model parameters
-    parser.add_argument('--weights', type=str, default='', help="initial weights path")
+    parser.add_argument('--weights', type=str, default='weights/checkpoint0055.pth', help="initial weights path")
     # * Backbone
     parser.add_argument('--position_embedding', default='learned', type=str, choices=('sine', 'learned'),
                         help="Type of positional embedding to use on top of the image features")
@@ -82,7 +82,7 @@ def get_args_parser():
     # dataset parameters
     parser.add_argument('--dataset_file', default='data/my_data.data')
     parser.add_argument('--cache_images', default=False, help="cache images to RAM")
-    parser.add_argument('--output_dir', default='',
+    parser.add_argument('--output_dir', default='weights',
                         help='path where to save, empty for no saving')
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--resume', default='', help='resume from checkpoint')
@@ -142,7 +142,7 @@ def main(args, hyp):
     start_epoch = 0
     scaler = torch.cuda.amp.GradScaler() if args.amp else None
     # If pretrained weights are specified, load pretrained weights
-    if args.weights.endswith(".pt"):
+    if args.weights.endswith(".pth"):
         ckpt = torch.load(args.weights, map_location=device)
         # load model
         try:
@@ -167,6 +167,7 @@ def main(args, hyp):
         if args.amp and "scaler" in ckpt:
             scaler.load_state_dict(ckpt["scaler"])
         del ckpt
+        print("Loading model from: ", args.weights, "finished.")
     else:
         checkpoint_path = os.path.join(tempfile.gettempdir(), "initial_weights.pt")
         if args.rank in [-1, 0]:
