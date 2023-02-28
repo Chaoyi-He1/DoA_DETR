@@ -44,7 +44,7 @@ def get_args_parser():
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
     # Model parameters
-    parser.add_argument('--weights', type=str, default='', help="initial weights path")
+    parser.add_argument('--weights', type=str, default='weights/checkpoint.pth', help="initial weights path")
     # * Backbone
     parser.add_argument('--position_embedding', default='learned', type=str, choices=('sine', 'learned'),
                         help="Type of positional embedding to use on top of the image features")
@@ -264,20 +264,23 @@ def main(args, hyp):
     for epoch in range(start_epoch, args.epochs + start_epoch):
         if args.distributed:
             sampler_train.set_epoch(epoch)
-        train_stats = train_one_epoch(model=model, criterion=criterion, data_loader=data_loader_train,
-                                      optimizer=optimizer, device=device, epoch=epoch, accumulate=accumulate,
-                                      max_norm=args.clip_max_norm, warmup=False, scaler=scaler)
+        
+        samples, targets, path, shapes, img_index = dataset_train.__getitem__(7630)
+        samples = utils.nested_tensor_from_tensor_list([samples]).to(device=device)
+        with torch.cuda.amp.autocast(enabled=scaler is not None):
+            out = model(samples)
+
         scheduler.step()
         if args.output_dir:
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs
-            if (epoch + 1) % 50 == 0:
+            if (epoch + 1) % args.lr_drop == 0 or (epoch + 1) % 50 == 0:
                 checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
             for checkpoint_path in checkpoint_paths:
                 utils.save_on_master({
                     'model': model.module.state_dict(),
                     'optimizer': optimizer.state_dict(),
-                    'lr_scheduler': scheduler.state_dict(),
+                    'lr_scheduler': lr_scheduler.state_dict(),
                     'epoch': epoch,
                     'args': args,
                 }, checkpoint_path)

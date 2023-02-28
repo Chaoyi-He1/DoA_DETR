@@ -3,13 +3,13 @@
 # Transformer
 d_model: 512
 nhead: 8
-num_encoder_layers: 6
-num_decoder_layers: 6
+num_encoder_layers: 4
+num_decoder_layers: 4
 dim_feedforward: 1024
 dropout: 0.4
 drop_path: 0.4
 activation: "relu"
-normalize_before: False
+normalize_before: True
 return_intermediate_dec: False
 num_queries: 100
 

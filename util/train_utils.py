@@ -4,6 +4,7 @@ from typing import Iterable
 import torch
 from torch.cuda import amp
 import util.misc as utils
+from util.position_ops import box_cxcywh_to_xyxy
 
 
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
@@ -43,6 +44,11 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module,
         
         with amp.autocast(enabled=scaler is not None):
             outputs = model(samples)
+
+            out_bbox = outputs["pred_boxes"].flatten(0, 1)  # [batch_size * num_queries, 4]
+            boxes1 = box_cxcywh_to_xyxy(out_bbox)
+            assert (boxes1[:, 2:] >= boxes1[:, :2]).all()
+
             loss_dict = criterion(outputs, targets)
             weight_dict = criterion.weight_dict
             losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)

@@ -6,3 +6,4 @@ runs/
 tmp.pk
 eval/
 nohup.out
+weights/
