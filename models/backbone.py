@@ -89,10 +89,11 @@ class DarkNet(nn.Module):
                 self.channels *= 2
                 self.img_size /= 2
         # self.res_net = nn.Sequential(*self.res_net)
-        self.spp = nn.ModuleList([nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2), 
+        self.spp = nn.ModuleList([nn.MaxPool2d(kernel_size=3, stride=1, padding=(3 - 1) // 2),
+                                  nn.MaxPool2d(kernel_size=5, stride=1, padding=(5 - 1) // 2), 
                                   nn.MaxPool2d(kernel_size=9, stride=1, padding=(9 - 1) // 2), 
                                   nn.MaxPool2d(kernel_size=13, stride=1, padding=(13 - 1) // 2)])
-        self.channels *= 4
+        self.channels *= 5
 
     def forward(self, inputs):
         # type: (Tensor) -> Tensor
