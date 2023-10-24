@@ -44,9 +44,9 @@ def get_args_parser():
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
     # Model parameters
-    parser.add_argument('--weights', type=str, default='weights/checkpoint0055.pth', help="initial weights path")
+    parser.add_argument('--weights', type=str, default='', help="initial weights path")
     # * Backbone
-    parser.add_argument('--position_embedding', default='learned', type=str, choices=('sine', 'learned'),
+    parser.add_argument('--position_embedding', default='sine', type=str, choices=('sine', 'learned'),
                         help="Type of positional embedding to use on top of the image features")
     parser.add_argument('--freeze-layers', type=bool, default=False,
                         help='Freeze non-output layers')
