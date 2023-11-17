@@ -37,9 +37,9 @@ def get_args_parser():
     parser.add_argument('--lr', default=1e-4, type=float)
     parser.add_argument('--lf', default=0.01, type=float)
     parser.add_argument('--batch_size', default=48, type=int)
-    parser.add_argument('--weight_decay', default=1e-4, type=float)
+    parser.add_argument('--weight_decay', default=0, type=float)
     parser.add_argument('--epochs', default=300, type=int)
-    parser.add_argument('--clip_max_norm', default=0.4, type=float, help='gradient clipping max norm')
+    parser.add_argument('--clip_max_norm', default=0.1, type=float, help='gradient clipping max norm')
     parser.add_argument('--device', default='cuda', help='device id (i.e. 0 or 0,1 or cpu)')
     parser.add_argument('--name', default='', help='renames results.txt to results_name.txt if supplied')
 
