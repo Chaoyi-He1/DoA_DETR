@@ -221,8 +221,8 @@ class DETR(nn.Module):
         hs = self.transformer(self.input_proj(src), mask, self.query_embed.weight, pos)[0]
 
         outputs_class = self.class_embed(hs)
-        outputs_coord = (self.bbox_embed(hs) / torch.max(self.bbox_embed(hs)).detach()).sigmoid()
-        outputs_direction = (self.direction_embed(hs) / torch.max(self.direction_embed(hs)).detach()).sigmoid()
+        outputs_coord = (self.bbox_embed(hs)).sigmoid()
+        outputs_direction = (self.direction_embed(hs) / torch.max(self.direction_embed(hs))).sigmoid()
         out = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1], 'pred_directions': outputs_direction[-1]}
         return out
     

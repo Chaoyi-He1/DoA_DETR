@@ -132,7 +132,7 @@ class LoadImagesAndLabels(Dataset):  # for training/testing
         self.labels = [np.zeros((0, 7), dtype=np.float32)] * n
         labels_loaded = False
         nm, nf, ne, nd = 0, 0, 0, 0  # number missing, found, empty, duplicate
-        np_labels_path = str(Path(self.label_files[0]).parent) + "npy"
+        np_labels_path = str(Path(path).parent) + ".npy"
 
         if os.path.isfile(np_labels_path):
             x = np.load(np_labels_path, allow_pickle=True)
